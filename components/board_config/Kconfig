@@ -1,0 +1,237 @@
+menu "PocketArcade"
+
+config PA_AP_SSID
+    string "Access-point SSID"
+    default "PocketArcade"
+
+config PA_AP_PASSWORD
+    string "Access-point password (empty for open network)"
+    default ""
+    help
+        Leave empty for an open access point. If set, use 8 to 63 bytes.
+
+config PA_AP_CHANNEL
+    int "Wi-Fi channel"
+    range 1 13
+    default 1
+
+config PA_AP_MAX_CLIENTS
+    int "Maximum associated clients"
+    range 1 10
+    default 8
+
+config PA_HOSTNAME
+    string "Device hostname"
+    default "play"
+
+config PA_PRESENCE_GRACE_MS
+    int "Presence reconnection grace period (ms)"
+    range 0 60000
+    default 10000
+
+config PA_MAX_PROFILES
+    int "Maximum persistent profiles"
+    range 1 256
+    default 64
+
+config PA_MAX_DEVICE_BINDINGS
+    int "Maximum device bindings per profile"
+    range 1 8
+    default 3
+
+config PA_MAX_NICKNAME_CODEPOINTS
+    int "Maximum nickname visible characters"
+    range 1 64
+    default 24
+
+config PA_MAX_NICKNAME_BYTES
+    int "Maximum nickname UTF-8 bytes"
+    range 24 256
+    default 96
+
+config PA_HTTP_MAX_BODY
+    int "Maximum HTTP JSON request body"
+    range 256 8192
+    default 2048
+
+config PA_AVATAR_MAX_BYTES
+    int "Maximum processed avatar JPEG size"
+    range 4096 32768
+    default 12288
+    help
+        Maximum decoded JPEG size accepted by the profile avatar endpoint.
+        The embedded browser crops and compresses photos before uploading.
+
+config PA_HTTP_MAX_OPEN_SOCKETS
+    int "Maximum HTTP/WebSocket sockets"
+    range 4 16
+    default 12
+
+config PA_HTTP_MAX_URI_HANDLERS
+    int "Maximum HTTP URI handlers"
+    range 12 40
+    default 36
+
+config PA_WS_MAX_MESSAGE
+    int "Maximum WebSocket message"
+    range 256 8192
+    default 2048
+
+config PA_WS_MAX_CONNECTIONS
+    int "Maximum tracked WebSockets"
+    range 2 16
+    default 10
+
+config PA_WS_MESSAGES_PER_SECOND
+    int "WebSocket per-connection message rate"
+    range 1 100
+    default 20
+
+config PA_PROFILE_MUTATION_INTERVAL_MS
+    int "Minimum interval between profile changes"
+    range 0 10000
+    default 750
+
+config PA_STORAGE_QUEUE_LENGTH
+    int "Storage operation queue length"
+    range 2 32
+    default 12
+
+config PA_SD_FORMAT_IF_UNMOUNTABLE
+    bool "Format cards without a mountable FAT filesystem"
+    default y
+    depends on !PA_SD_DISABLED
+    help
+        Automatically partition and format a card when ESP-IDF reports that
+        it has no mountable FAT filesystem. This provisions blank cards, but
+        also erases cards using unsupported filesystems such as exFAT and
+        cards whose FAT metadata is corrupt. Communication, timeout, and I/O
+        failures are never formatted.
+
+choice PA_SD_INTERFACE
+    prompt "SD-card interface"
+    default PA_SD_DISABLED
+
+config PA_SD_DISABLED
+    bool "Disabled (safe default)"
+
+config PA_SD_SDMMC
+    bool "Native SDMMC"
+
+config PA_SD_SDSPI
+    bool "SDSPI"
+endchoice
+
+choice PA_SDMMC_WIDTH
+    prompt "SDMMC bus width"
+    depends on PA_SD_SDMMC
+    default PA_SDMMC_WIDTH_1
+
+config PA_SDMMC_WIDTH_1
+    bool "1 bit"
+
+config PA_SDMMC_WIDTH_4
+    bool "4 bit"
+endchoice
+
+config PA_SD_CLOCK_KHZ
+    int "SD clock (kHz)"
+    range 400 40000
+    default 20000
+    depends on !PA_SD_DISABLED
+
+config PA_SDMMC_CLK_PIN
+    int "SDMMC CLK GPIO (-1 uses target fixed pin)"
+    range -1 48
+    default -1
+    depends on PA_SD_SDMMC
+
+config PA_SDMMC_CMD_PIN
+    int "SDMMC CMD GPIO (-1 uses target fixed pin)"
+    range -1 48
+    default -1
+    depends on PA_SD_SDMMC
+
+config PA_SDMMC_D0_PIN
+    int "SDMMC D0 GPIO (-1 uses target fixed pin)"
+    range -1 48
+    default -1
+    depends on PA_SD_SDMMC
+
+config PA_SDMMC_D1_PIN
+    int "SDMMC D1 GPIO (-1 uses target fixed pin)"
+    range -1 48
+    default -1
+    depends on PA_SD_SDMMC && PA_SDMMC_WIDTH_4
+
+config PA_SDMMC_D2_PIN
+    int "SDMMC D2 GPIO (-1 uses target fixed pin)"
+    range -1 48
+    default -1
+    depends on PA_SD_SDMMC && PA_SDMMC_WIDTH_4
+
+config PA_SDMMC_D3_PIN
+    int "SDMMC D3 GPIO (-1 uses target fixed pin)"
+    range -1 48
+    default -1
+    depends on PA_SD_SDMMC && PA_SDMMC_WIDTH_4
+
+choice PA_SDSPI_HOST
+    prompt "SDSPI host"
+    default PA_SDSPI_HOST_SPI2
+    depends on PA_SD_SDSPI
+
+config PA_SDSPI_HOST_SPI2
+    bool "SPI2"
+
+config PA_SDSPI_HOST_SPI3
+    bool "SPI3"
+endchoice
+
+config PA_SDSPI_MOSI_PIN
+    int "SDSPI MOSI GPIO (-1 unset)"
+    range -1 48
+    default -1
+    depends on PA_SD_SDSPI
+
+config PA_SDSPI_MISO_PIN
+    int "SDSPI MISO GPIO (-1 unset)"
+    range -1 48
+    default -1
+    depends on PA_SD_SDSPI
+
+config PA_SDSPI_CLK_PIN
+    int "SDSPI CLK GPIO (-1 unset)"
+    range -1 48
+    default -1
+    depends on PA_SD_SDSPI
+
+config PA_SDSPI_CS_PIN
+    int "SDSPI CS GPIO (-1 unset)"
+    range -1 48
+    default -1
+    depends on PA_SD_SDSPI
+
+config PA_SD_CARD_DETECT_PIN
+    int "Card-detect GPIO (-1 disables)"
+    range -1 48
+    default -1
+    depends on !PA_SD_DISABLED
+
+config PA_SD_CARD_DETECT_ACTIVE_LOW
+    bool "Card detect is active-low"
+    default y
+    depends on PA_SD_CARD_DETECT_PIN >= 0
+
+config PA_SD_POWER_PIN
+    int "SD power-control GPIO (-1 disables)"
+    range -1 48
+    default -1
+    depends on !PA_SD_DISABLED
+
+config PA_SD_POWER_ACTIVE_HIGH
+    bool "SD power enable is active-high"
+    default y
+    depends on PA_SD_POWER_PIN >= 0
+
+endmenu

@@ -1,0 +1,9 @@
+{
+  "manifestVersion": 1,
+  "id": "tic-tac-toe",
+  "name": "Tic-Tac-Toe",
+  "description": "Two players share the board while everyone else watches.",
+  "entrypoint": "app.js",
+  "stylesheet": "app.css",
+  "kind": "game"
+}

@@ -1,0 +1,16 @@
+#pragma once
+
+#include "sdkconfig.h"
+
+#define PA_PRODUCT_NAME "PocketArcade"
+#define PA_FIRMWARE_VERSION "0.1.0"
+#define PA_PROTOCOL_VERSION 1
+#define PA_GATEWAY_STRING "192.168.4.1"
+#define PA_SD_MOUNT_POINT "/sdcard"
+#define PA_DEVICE_SECRET_BYTES 32
+#define PA_FINGERPRINT_HEX_LEN 32
+#define PA_FINGERPRINT_BYTES (PA_FINGERPRINT_HEX_LEN / 2)
+#define PA_SESSION_TOKEN_HEX_LEN 64
+#define PA_PROFILE_ID_LEN 18
+#define PA_CONNECTION_ID_LEN 18
+#define PA_AVATAR_URL_LEN 64

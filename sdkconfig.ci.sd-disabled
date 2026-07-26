@@ -1,0 +1,3 @@
+CONFIG_PA_SD_DISABLED=y
+# CONFIG_PA_SD_SDMMC is not set
+# CONFIG_PA_SD_SDSPI is not set

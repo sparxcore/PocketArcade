@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="PocketArcade">
+  <defs>
+    <linearGradient id="g" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b9adff"/>
+      <stop offset="1" stop-color="#4fe1c4"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="17" fill="#241d43" stroke="url(#g)" stroke-width="3"/>
+  <path d="M19 26h26a8 8 0 0 1 7.6 10.5l-3.1 9.3a5.4 5.4 0 0 1-9.1 2L36.8 44h-9.6l-3.6 3.8a5.4 5.4 0 0 1-9.1-2l-3.1-9.3A8 8 0 0 1 19 26Z" fill="url(#g)"/>
+  <path d="M23 32v8M19 36h8" stroke="#211a3c" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="42" cy="34" r="2.2" fill="#211a3c"/>
+  <circle cx="46" cy="39" r="2.2" fill="#211a3c"/>
+  <path d="m28 18 4-5 4 5" fill="none" stroke="#f8dc6b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

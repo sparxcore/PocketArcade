@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#17132d">
+  <title>PocketArcade</title>
+  <link rel="icon" href="/assets/system/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/system/app.css">
+  <script src="/system/pocket-arcade.js" defer></script>
+  <script src="/system/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <main id="main" class="shell">
+    <header class="brand">
+      <img src="/assets/system/icon.svg" alt="" width="48" height="48">
+      <div>
+        <p class="eyebrow">LOCAL MULTIPLAYER</p>
+        <h1>PocketArcade</h1>
+      </div>
+      <div class="header-actions">
+        <span id="connection-pill" class="status-pill" aria-live="polite">Starting</span>
+        <details id="account-pill" class="account-pill" hidden>
+          <summary aria-label="Open player account menu">
+            <span id="account-avatar" class="account-avatar" aria-hidden="true">?</span>
+            <span id="account-wins" class="win-roundel"
+                  data-tier="0" aria-label="0 game wins">0</span>
+            <span id="account-name">Player</span>
+          </summary>
+          <div class="account-menu" aria-label="Player account actions">
+            <p id="profile-persistence" class="account-status"></p>
+            <button id="photo-button" type="button">Add profile photo</button>
+            <input id="photo-input" type="file" accept="image/*"
+                   capture="user" hidden>
+            <p id="photo-error" class="error account-error"
+               role="alert"></p>
+            <button id="edit-button" type="button">Edit nickname</button>
+            <button id="admin-button" type="button" hidden>Admin</button>
+            <button id="switch-button" type="button">Switch player</button>
+            <button id="delete-button" class="danger-quiet" type="button">Delete profile</button>
+          </div>
+        </details>
+      </div>
+    </header>
+
+    <section id="loading-view" class="card view" aria-labelledby="loading-title">
+      <div class="loader" aria-hidden="true"></div>
+      <h2 id="loading-title">Getting the arcade ready</h2>
+      <p id="loading-message">Checking this PocketArcade…</p>
+    </section>
+
+    <section id="setup-view" class="card view" hidden aria-labelledby="setup-title">
+      <p class="step">PLAYER SETUP</p>
+      <h2 id="setup-title">Choose a nickname</h2>
+      <p>This name will be shown to other players connected to this PocketArcade.</p>
+      <form id="nickname-form" novalidate>
+        <label for="nickname">Nickname</label>
+        <input id="nickname" name="nickname" type="text" required
+               maxlength="96" autocomplete="nickname" enterkeyhint="done"
+               aria-describedby="nickname-help nickname-error">
+        <div class="field-meta">
+          <span id="nickname-help">1–24 visible characters</span>
+          <span id="nickname-count">0 / 24</span>
+        </div>
+        <p id="nickname-error" class="error" role="alert"></p>
+        <p id="storage-notice" class="notice" hidden>
+          No SD card is available. Your profile will work now, but will not
+          survive a PocketArcade restart.
+        </p>
+        <button id="continue-button" class="primary" type="submit">Continue</button>
+      </form>
+    </section>
+
+    <section id="lobby-view" class="view" hidden aria-label="Lobby">
+      <aside id="welcome-banner" class="welcome" aria-live="polite">
+        <span id="welcome-text"></span>
+      </aside>
+
+      <div class="lobby-grid">
+        <div class="lobby-column">
+          <section class="card" aria-labelledby="players-title">
+            <div class="section-heading">
+              <div>
+                <p class="step">LOBBY</p>
+                <h2 id="players-title">Players online</h2>
+              </div>
+              <strong id="player-count" class="count-badge">0</strong>
+            </div>
+            <ul id="player-list" class="player-list" aria-live="polite"></ul>
+            <p id="empty-players" class="empty">Waiting for players to join…</p>
+          </section>
+
+          <section class="card chat-card" aria-labelledby="chat-title">
+            <div class="section-heading">
+              <div>
+                <p class="step">LIVE</p>
+                <h2 id="chat-title">Chat</h2>
+              </div>
+              <span class="chat-limit">Last 50</span>
+            </div>
+            <ol id="chat-messages" class="chat-messages" role="log"
+                aria-live="polite" aria-relevant="additions"></ol>
+            <p id="empty-chat" class="empty">No messages yet. Say hello!</p>
+            <form id="chat-form" class="chat-form">
+              <label class="sr-only" for="chat-input">Message</label>
+              <input id="chat-input" type="text" maxlength="320"
+                     autocomplete="off" enterkeyhint="send"
+                     placeholder="Message everyone">
+              <button id="chat-send" class="primary" type="submit">Send</button>
+            </form>
+            <p id="chat-error" class="error compact-error" role="alert"></p>
+          </section>
+        </div>
+
+        <section class="card" aria-labelledby="games-title">
+          <div class="section-heading">
+            <div>
+              <p class="step">LAUNCHER</p>
+              <h2 id="games-title">Games</h2>
+            </div>
+            <span class="storage-dot" aria-hidden="true"></span>
+          </div>
+          <div id="app-list" class="app-list"></div>
+          <div id="empty-apps" class="empty-state">
+            <span class="empty-icon" aria-hidden="true">✦</span>
+            <h3>No games installed yet</h3>
+            <p>Insert the PocketArcade SD card to load games.</p>
+          </div>
+        </section>
+      </div>
+
+      <section id="active-app-panel" class="card active-app-panel" hidden
+               aria-labelledby="active-app-title">
+        <div class="section-heading">
+          <div>
+            <p class="step">NOW PLAYING</p>
+            <h2 id="active-app-title">Game</h2>
+          </div>
+          <button id="close-app" type="button">Close game</button>
+        </div>
+        <div id="active-app-host"></div>
+        <p id="app-error" class="error" role="alert"></p>
+      </section>
+
+      <section class="storage-bar" aria-live="polite">
+        <span id="storage-indicator" class="storage-indicator"></span>
+        <div class="storage-copy">
+          <strong id="storage-title">Checking storage</strong>
+          <p id="storage-detail">Please wait…</p>
+        </div>
+      </section>
+    </section>
+
+    <section id="fatal-view" class="card view" hidden>
+      <h2>Couldn’t reach PocketArcade</h2>
+      <p id="fatal-message">Stay connected to the PocketArcade Wi-Fi and try again.</p>
+      <button id="retry-button" class="primary" type="button">Try again</button>
+    </section>
+
+    <footer>
+      Portal didn’t open automatically? Visit
+      <a href="http://192.168.4.1/">192.168.4.1</a>.
+    </footer>
+  </main>
+
+  <dialog id="edit-dialog">
+    <form id="edit-form" method="dialog">
+      <h2>Edit nickname</h2>
+      <label for="edit-nickname">Nickname</label>
+      <input id="edit-nickname" maxlength="96" required autocomplete="nickname">
+      <p id="edit-error" class="error" role="alert"></p>
+      <div class="dialog-actions">
+        <button value="cancel">Cancel</button>
+        <button id="save-nickname" class="primary" value="default">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="admin-dialog">
+    <form method="dialog">
+      <p class="step">ADMINISTRATOR</p>
+      <h2>SD card controls</h2>
+      <p id="admin-storage-status">
+        Checking removable storage…
+      </p>
+      <p class="notice">
+        Always wait until PocketArcade says the card is safe to remove.
+      </p>
+      <div class="dialog-actions admin-actions">
+        <button value="close">Close</button>
+        <button id="storage-action" class="primary" type="button"
+                hidden>Eject SD card</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog">
+    <form method="dialog">
+      <h2 id="confirm-title">Are you sure?</h2>
+      <p id="confirm-message"></p>
+      <div class="dialog-actions">
+        <button value="cancel">Cancel</button>
+        <button id="confirm-action" class="danger" value="confirm">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,6 @@
+build/
+sdkconfig
+sdkconfig.old
+main/generated/
+__pycache__/
+*.pyc
