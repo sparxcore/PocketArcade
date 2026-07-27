@@ -12,7 +12,8 @@ idf_component_register(
         profiles
         presence
         chat
-        tic_tac_toe
+        game_runtime
+        game_platform
         protocol
         app_catalogue
         embedded_web

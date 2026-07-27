@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Pocket Chomp icon">
+  <rect width="128" height="128" rx="28" fill="#090b1c"/>
+  <path d="M22 18h84a4 4 0 0 1 4 4v84a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4Zm12 18v56h18V74h24v18h18V36H76v20H52V36Z" fill="none" stroke="#645cff" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M59 64a24 24 0 1 0 9-18l15 18-15 18a24 24 0 0 0-9-18Z" fill="#ffe24a"/>
+  <circle cx="92" cy="64" r="5" fill="#ff5ca8"/>
+  <circle cx="108" cy="64" r="3" fill="#8bf9ff"/>
+</svg>

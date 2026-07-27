@@ -55,10 +55,37 @@ The embedded UI, chat, presence, and temporary profiles remain operational.
 
 ## Game does not appear
 
-Safely eject the card and verify `/apps/tic-tac-toe/` contains
-`manifest.json`, `app.js`, and `app.css`. The directory and manifest ID must
-both be `tic-tac-toe`. Reinsert and choose **Mount SD card**. Invalid manifests
-are ignored and logged with `APPS`.
+Safely eject the card and verify the directory under `/apps/<app-id>/` contains
+`manifest.json`, `client/app.js`, `client/app.css`, and `server/main.lua`. The
+directory and manifest ID must match exactly. Reinsert and choose **Mount SD
+card**. Invalid manifests are ignored and logged with `APPS`; common causes are
+an unsupported `minPlatformVersion`, an excessive tick rate or file size, a
+missing entrypoint, and an unapproved capability.
+
+## Realtime game joins but does not advance
+
+Check `GAME_PLATFORM` and `GAME_RUNTIME` logs. A tick runtime advances only
+after the platform match reaches `playing`, which requires the manifest's
+minimum player count and every seated player to send `game.ready`. Confirm the
+client uses `arcade.game.ready(matchId)` after joining and does not open a
+second WebSocket.
+
+Tick overruns and dropped accumulated ticks are logged by `GAME_PLATFORM`.
+Repeated runtime faults normally indicate a Lua instruction, callback-time, or
+memory limit; only that match should stop. If the whole device resets, retain
+the boot/crash log because that is a firmware fault rather than an expected
+sandbox termination.
+
+## Realtime view freezes or jumps
+
+The authoritative snapshot rate is capped at 15 Hz even when simulation runs
+at 20–30 Hz. Render at display speed and interpolate visual state rather than
+sending or expecting one snapshot per frame. After reconnect or controller
+claim, request a full state with `arcade.game.requestSnapshot(matchId)`.
+
+Each connection retains only its latest unsent realtime snapshot. A connection
+that repeatedly cannot drain its bounded queue is closed and should reconnect;
+other players and the match remain active.
 
 ## Removing the SD card
 

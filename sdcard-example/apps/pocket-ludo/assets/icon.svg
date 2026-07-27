@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Pocket Ludo icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b2150"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="pawn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff8c7e"/>
+      <stop offset="1" stop-color="#e4475d"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="52" fill="url(#bg)"/>
+  <path d="M76 44h104a32 32 0 0 1 32 32v104a32 32 0 0 1-32 32H76a32 32 0 0 1-32-32V76a32 32 0 0 1 32-32Z" fill="#fff" opacity=".09"/>
+  <g fill="#fff" opacity=".2">
+    <circle cx="76" cy="76" r="13"/><circle cx="180" cy="76" r="13"/>
+    <circle cx="76" cy="180" r="13"/><circle cx="180" cy="180" r="13"/>
+  </g>
+  <path d="M128 62c-19 0-34 15-34 34 0 12 6 22 15 28-18 8-30 26-30 47 0 9 7 16 16 16h66c9 0 16-7 16-16 0-21-12-39-30-47 9-6 15-16 15-28 0-19-15-34-34-34Z" fill="url(#pawn)" stroke="#fff" stroke-width="7" stroke-linejoin="round"/>
+  <path d="m103 42 12 12 13-22 13 22 12-12 6 31h-62Z" fill="#ffd764" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>
+  <circle cx="128" cy="96" r="9" fill="#fff" opacity=".35"/>
+</svg>

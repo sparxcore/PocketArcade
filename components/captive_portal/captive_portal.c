@@ -77,7 +77,8 @@ static void dns_task(void *argument)
 static esp_err_t captive_redirect(httpd_req_t *request)
 {
     httpd_resp_set_status(request, "302 Found");
-    httpd_resp_set_hdr(request, "Location", "http://" PA_GATEWAY_STRING "/");
+    httpd_resp_set_hdr(request, "Location",
+                       "http://" PA_GATEWAY_STRING "/portal");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
     httpd_resp_set_type(request, "text/html; charset=utf-8");
     ESP_LOGI(TAG, "Redirecting captive check %s", request->uri);
@@ -85,7 +86,8 @@ static esp_err_t captive_redirect(httpd_req_t *request)
         request,
         "<!doctype html><meta charset=utf-8><title>PocketArcade</title>"
         "<p>Opening PocketArcade… "
-        "<a href=\"http://" PA_GATEWAY_STRING "/\">Continue</a></p>",
+        "<a href=\"http://" PA_GATEWAY_STRING
+        "/portal\">Continue</a></p>",
         HTTPD_RESP_USE_STRLEN);
 }
 
@@ -93,7 +95,7 @@ static esp_err_t captive_api(httpd_req_t *request)
 {
     static const char response[] =
         "{\"captive\":true,"
-        "\"user-portal-url\":\"http://" PA_GATEWAY_STRING "/\"}";
+        "\"user-portal-url\":\"http://" PA_GATEWAY_STRING "/portal\"}";
     httpd_resp_set_type(request, "application/captive+json");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
     httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");

@@ -33,7 +33,10 @@
         cell.dataset.cell = String(index);
         cell.setAttribute("role", "gridcell");
         cell.setAttribute("aria-label", `Square ${index + 1}, empty`);
-        cell.addEventListener("click", () => arcade.playTicTacToe(index));
+        cell.addEventListener("click", () => {
+          const match = arcade.game.currentMatch();
+          if (match) arcade.game.send(match.matchId, "move", { cell: index });
+        });
         cells.push(cell);
         board.append(cell);
       }
@@ -41,13 +44,17 @@
       const actions = element("div", "ttt-actions");
       const join = element("button", "primary", "Join game");
       join.type = "button";
-      join.addEventListener("click", () => arcade.joinTicTacToe());
+      join.addEventListener("click", () => arcade.game.join("tic-tac-toe"));
       const leave = element("button", "", "Leave seat");
       leave.type = "button";
-      leave.addEventListener("click", () => arcade.leaveTicTacToe());
+      leave.addEventListener("click", () => {
+        const match = arcade.game.currentMatch();
+        if (match) arcade.game.leave(match.matchId);
+      });
       const reset = element("button", "", "Play again");
       reset.type = "button";
-      reset.addEventListener("click", () => arcade.resetTicTacToe());
+      reset.addEventListener("click", () =>
+        arcade.game.join("tic-tac-toe"));
       actions.append(join, leave, reset);
       const error = element("p", "ttt-error", "");
       error.setAttribute("role", "alert");
@@ -83,7 +90,7 @@
               : `Spectating · ${turnName}'s turn`;
         } else if (game.status === "won") {
           const winner = game.players?.[game.winner]?.nickname || game.winner;
-          status.textContent = `${winner} wins! The win was added to their profile.`;
+          status.textContent = `${winner} wins!`;
         } else if (game.status === "draw") {
           status.textContent = "Draw game";
         } else {
@@ -99,13 +106,29 @@
           !["won", "draw"].includes(game.status);
       };
 
-      const stopGame = arcade.on("game.changed", render);
-      const stopError = arcade.on("game.error", (value) => {
+      let currentMatch = arcade.game.currentMatch();
+      const stopMatch = arcade.game.onMatch((match) => {
+        currentMatch = match;
+        const ownSeat = match.seats
+          ?.find((seat) => seat.seat === match.you?.seat);
+        if (match.you?.role === "player" && !ownSeat?.ready) {
+          arcade.game.ready(match.matchId);
+        }
+      });
+      const stopGame = arcade.game.onSnapshot((snapshot) => {
+        render(snapshot.payload);
+      });
+      const stopError = arcade.game.onError((value) => {
         error.textContent = value?.message || "The game action failed.";
         window.setTimeout(() => { error.textContent = ""; }, 5000);
       });
-      render(arcade.game);
+      const initialSnapshot = arcade.game.currentSnapshot();
+      if (initialSnapshot) render(initialSnapshot.payload);
+      if (currentMatch?.you?.role === "player") {
+        arcade.game.ready(currentMatch.matchId);
+      }
       return () => {
+        stopMatch();
         stopGame();
         stopError();
         container.replaceChildren();

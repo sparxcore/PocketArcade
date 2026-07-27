@@ -1,0 +1,686 @@
+.pocketracers {
+  --pr-bg: #10151b;
+  --pr-panel: #171e26;
+  --pr-panel-2: #202a34;
+  --pr-border: rgba(255, 255, 255, 0.12);
+  --pr-text: #f4f7fa;
+  --pr-muted: #9da9b5;
+  --pr-accent: #55d7f2;
+  --pr-danger: #ff7186;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  color: var(--pr-text);
+  font: inherit;
+}
+
+.pocketracers * {
+  box-sizing: border-box;
+}
+
+.pocketracers button {
+  min-height: 44px;
+  border: 1px solid var(--pr-border);
+  border-radius: 12px;
+  background: var(--pr-panel-2);
+  color: var(--pr-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.pocketracers button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.pocketracers button:focus-visible {
+  outline: 3px solid var(--pr-accent);
+  outline-offset: 2px;
+}
+
+.pocketracers .pr-primary {
+  border-color: rgba(85, 215, 242, 0.7);
+  background: #17677a;
+}
+
+.pocketracers .pr-danger {
+  border-color: rgba(255, 113, 134, 0.65);
+  background: #6d2937;
+}
+
+.pocketracers .pr-hidden {
+  display: none !important;
+}
+
+.pocketracers .pr-topbar,
+.pocketracers .pr-actions,
+.pocketracers .pr-selection-heading,
+.pocketracers .pr-player,
+.pocketracers .pr-brand {
+  display: flex;
+  align-items: center;
+}
+
+.pocketracers .pr-topbar {
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pocketracers .pr-brand {
+  gap: 10px;
+  min-width: 0;
+}
+
+.pocketracers .pr-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+}
+
+.pocketracers .pr-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.pocketracers .pr-status {
+  min-width: 0;
+  color: var(--pr-muted);
+  text-align: right;
+}
+
+.pocketracers .pr-status[data-state="ok"] {
+  color: #72df9d;
+}
+
+.pocketracers .pr-status[data-state="warn"] {
+  color: #f6d365;
+}
+
+.pocketracers .pr-status[data-state="error"] {
+  color: #ff8d9f;
+}
+
+.pocketracers .pr-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pocketracers .pr-actions button {
+  padding: 8px 15px;
+}
+
+.pocketracers .pr-selection {
+  display: grid;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--pr-border);
+  border-radius: 16px;
+  background: var(--pr-panel);
+}
+
+.pocketracers .pr-selection-group {
+  display: grid;
+  gap: 9px;
+}
+
+.pocketracers .pr-selection-heading {
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pocketracers .pr-section-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.pocketracers .pr-selection-note,
+.pocketracers .pr-choice-description,
+.pocketracers .pr-player-meta,
+.pocketracers .pr-help,
+.pocketracers .pr-side-label {
+  color: var(--pr-muted);
+  font-size: 0.86rem;
+}
+
+.pocketracers .pr-car-choices,
+.pocketracers .pr-track-choices {
+  display: grid;
+  gap: 10px;
+}
+
+.pocketracers .pr-car-choices {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pocketracers .pr-track-choices {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.pocketracers .pr-car-choice,
+.pocketracers .pr-track-choice {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  text-align: left;
+}
+
+.pocketracers .pr-car-choice[data-selected="true"],
+.pocketracers .pr-track-choice[data-selected="true"] {
+  border-color: var(--pr-accent);
+  background: #153944;
+  box-shadow: inset 0 0 0 1px rgba(85, 215, 242, 0.34);
+}
+
+.pocketracers .pr-car-swatch {
+  position: relative;
+  height: 50px;
+  border-radius: 11px;
+  background: linear-gradient(155deg, rgba(255,255,255,0.08), rgba(0,0,0,0.15));
+  overflow: hidden;
+}
+
+.pocketracers .pr-car-swatch::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 58px;
+  height: 25px;
+  border-radius: 46% 55% 42% 46%;
+  background: var(--car-body);
+  border: 2px solid rgba(255,255,255,0.3);
+  transform: translate(-50%, -50%);
+}
+
+.pocketracers .pr-car-swatch::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 25px;
+  height: 15px;
+  border-radius: 45%;
+  background: var(--car-trim);
+  border-left: 5px solid #243545;
+  border-right: 5px solid #243545;
+  transform: translate(-50%, -50%);
+}
+
+.pocketracers .pr-choice-name {
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pocketracers .pr-choice-description {
+  min-height: 2.2em;
+  line-height: 1.25;
+}
+
+.pocketracers .pr-stats {
+  display: grid;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.pocketracers .pr-stat-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  color: var(--pr-muted);
+  font-size: 0.75rem;
+}
+
+.pocketracers .pr-stat-bars {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pocketracers .pr-stat-bars i {
+  display: block;
+  width: 9px;
+  height: 5px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.14);
+}
+
+.pocketracers .pr-stat-bars i[data-on="true"] {
+  background: var(--pr-accent);
+}
+
+.pocketracers .pr-track-preview {
+  width: 100%;
+  height: 86px;
+  border-radius: 9px;
+  background: #284831;
+}
+
+.pocketracers .pr-race-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 235px);
+  gap: 12px;
+  min-width: 0;
+}
+
+.pocketracers .pr-stage {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--pr-border);
+  border-radius: 16px;
+  background: #274a31;
+}
+
+.pocketracers .pr-canvas {
+  display: block;
+  width: 100%;
+  height: clamp(320px, 58vw, 610px);
+  touch-action: none;
+}
+
+.pocketracers .pr-overlay {
+  position: absolute;
+  inset: 10px;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-content: start;
+  gap: 7px;
+  pointer-events: none;
+}
+
+.pocketracers .pr-position,
+.pocketracers .pr-lap,
+.pocketracers .pr-speed {
+  padding: 6px 9px;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 9px;
+  background: rgba(9, 13, 17, 0.76);
+  backdrop-filter: blur(3px);
+  font-weight: 800;
+}
+
+.pocketracers .pr-speed {
+  justify-self: end;
+}
+
+.pocketracers .pr-countdown {
+  grid-column: 1 / -1;
+  align-self: center;
+  justify-self: center;
+  margin-top: 95px;
+  color: white;
+  font-size: clamp(3rem, 14vw, 7rem);
+  font-weight: 900;
+  text-shadow: 0 5px 18px rgba(0,0,0,0.7);
+}
+
+.pocketracers .pr-side {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--pr-border);
+  border-radius: 16px;
+  background: var(--pr-panel);
+}
+
+.pocketracers .pr-track-info {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--pr-border);
+}
+
+.pocketracers .pr-track-name {
+  font-weight: 800;
+}
+
+.pocketracers .pr-players {
+  display: grid;
+  gap: 8px;
+}
+
+.pocketracers .pr-player {
+  gap: 9px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.035);
+}
+
+.pocketracers .pr-player[data-self="true"] {
+  border-color: rgba(85,215,242,0.45);
+  background: rgba(85,215,242,0.075);
+}
+
+.pocketracers .pr-avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 2px solid rgba(255,255,255,0.18);
+  border-radius: 50%;
+  background: #303d4a;
+}
+
+.pocketracers .pr-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pocketracers .pr-avatar-fallback {
+  font-weight: 900;
+}
+
+.pocketracers .pr-player-info {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.pocketracers .pr-player-name {
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pocketracers .pr-seat-chip {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 2px solid var(--seat-colour);
+  border-radius: 50%;
+  color: var(--seat-colour);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.pocketracers .pr-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(64px, 1fr));
+  gap: 9px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pocketracers .pr-control {
+  min-height: 62px;
+  font-size: 1rem;
+  touch-action: none;
+}
+
+.pocketracers .pr-control[data-active="true"] {
+  border-color: var(--pr-accent);
+  background: #17677a;
+  transform: translateY(1px);
+}
+
+.pocketracers .pr-throttle {
+  border-color: rgba(114,223,157,0.6);
+}
+
+.pocketracers .pr-brake {
+  border-color: rgba(255,113,134,0.6);
+}
+
+.pocketracers .pr-help {
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .pocketracers .pr-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pocketracers .pr-status {
+    text-align: left;
+  }
+
+  .pocketracers .pr-car-choices {
+    grid-template-columns: 1fr;
+  }
+
+  .pocketracers .pr-track-choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pocketracers .pr-car-choice {
+    grid-template-columns: 86px minmax(0, 1fr);
+  }
+
+  .pocketracers .pr-car-choice .pr-stats {
+    grid-column: 1 / -1;
+  }
+
+  .pocketracers .pr-race-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pocketracers .pr-side {
+    order: -1;
+  }
+
+  .pocketracers .pr-players {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pocketracers .pr-canvas {
+    height: clamp(330px, 88vw, 520px);
+  }
+}
+
+@media (max-width: 430px) {
+  .pocketracers .pr-track-choices,
+  .pocketracers .pr-players {
+    grid-template-columns: 1fr;
+  }
+
+  .pocketracers .pr-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pocketracers .pr-canvas {
+    height: 390px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pocketracers .pr-control[data-active="true"] {
+    transform: none;
+  }
+}
+
+/* Sequential lobby and fullscreen race presentation. */
+.pocketracers .pr-stage-copy {
+  margin: 0;
+  color: var(--pr-muted);
+  line-height: 1.45;
+}
+
+.pocketracers .pr-lobby-players {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--pr-border);
+  border-radius: 16px;
+  background: var(--pr-panel);
+}
+
+.pocketracers .pr-track-votes {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 5px;
+}
+
+.pocketracers .pr-track-voter {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--seat-colour);
+  border-radius: 50%;
+  background: rgba(10, 15, 20, 0.82);
+  color: var(--seat-colour);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.pocketracers .pr-race-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pocketracers .pr-track-hud {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 5px 8px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 8px;
+  background: rgba(9, 13, 17, 0.7);
+  color: rgba(255,255,255,0.78);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.pocketracers .pr-race-standings {
+  position: absolute;
+  top: 62px;
+  left: 10px;
+  display: grid;
+  gap: 4px;
+  max-width: min(48%, 220px);
+  pointer-events: none;
+}
+
+.pocketracers .pr-standing-row {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 7px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: rgba(7, 11, 15, 0.72);
+  backdrop-filter: blur(3px);
+  font-size: 0.76rem;
+}
+
+.pocketracers .pr-standing-row[data-self="true"] {
+  border-color: rgba(85,215,242,0.66);
+  background: rgba(14, 62, 74, 0.82);
+}
+
+.pocketracers .pr-standing-place {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border: 2px solid var(--seat-colour);
+  border-radius: 50%;
+  color: var(--seat-colour);
+  font-weight: 900;
+}
+
+.pocketracers .pr-standing-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.pocketracers .pr-standing-lap {
+  color: rgba(255,255,255,0.72);
+  font-weight: 800;
+}
+
+.pocketracers.fullscreen {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  gap: 7px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  background: #10151b;
+}
+
+.pocketracers.fullscreen .pr-topbar,
+.pocketracers.fullscreen .pr-actions,
+.pocketracers.fullscreen .pr-selection,
+.pocketracers.fullscreen .pr-lobby-players,
+.pocketracers.fullscreen .pr-help {
+  display: none !important;
+}
+
+.pocketracers.fullscreen .pr-race-layout,
+.pocketracers.fullscreen .pr-stage {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.pocketracers.fullscreen .pr-stage {
+  border: 0;
+  border-radius: 0;
+}
+
+.pocketracers.fullscreen .pr-canvas {
+  height: 100%;
+  min-height: 0;
+}
+
+.pocketracers.fullscreen .pr-overlay {
+  inset: 56px 10px 10px;
+}
+
+.pocketracers.fullscreen .pr-race-standings {
+  top: 108px;
+  left: 10px;
+}
+
+.pocketracers.fullscreen .pr-controls {
+  grid-template-columns: repeat(4, minmax(64px, 1fr));
+  gap: 8px;
+  padding: 0 9px calc(8px + env(safe-area-inset-bottom));
+}
+
+.pocketracers.fullscreen .pr-control {
+  min-height: 68px;
+}
+
+@media (max-width: 560px) {
+  .pocketracers.fullscreen .pr-race-standings {
+    max-width: 54%;
+  }
+
+  .pocketracers.fullscreen .pr-standing-row {
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    padding: 3px 5px;
+    font-size: 0.68rem;
+  }
+
+  .pocketracers.fullscreen .pr-controls {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

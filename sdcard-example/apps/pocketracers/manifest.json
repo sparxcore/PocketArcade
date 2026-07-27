@@ -1,0 +1,33 @@
+{
+  "manifestVersion": 2,
+  "id": "pocketracers",
+  "name": "PocketRacers",
+  "description": "A two-to-four-player top-down circuit racing game.",
+  "version": "1.1.2",
+  "minPlatformVersion": "0.3.0",
+  "kind": "game",
+  "client": {
+    "entrypoint": "client/app.js",
+    "stylesheet": "client/app.css"
+  },
+  "runtime": {
+    "type": "lua",
+    "entrypoint": "server/main.lua",
+    "mode": "tick",
+    "tickRateHz": 15
+  },
+  "multiplayer": {
+    "minPlayers": 2,
+    "maxPlayers": 4,
+    "spectators": true,
+    "lateJoin": "spectator",
+    "reconnectGraceMs": 30000
+  },
+  "protocol": {
+    "version": 1
+  },
+  "capabilities": [
+    "match.seats",
+    "match.results"
+  ]
+}

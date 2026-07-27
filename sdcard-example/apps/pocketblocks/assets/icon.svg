@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">PocketBlocks icon</title>
+  <desc id="desc">Interlocking falling blocks inside a rounded square.</desc>
+  <rect width="256" height="256" rx="44" fill="#101522"/>
+  <g stroke="#101522" stroke-width="8" stroke-linejoin="round">
+    <path fill="#66d9ff" d="M38 42h54v54H38zM92 42h54v54H92zM146 42h54v54h-54zM92 96h54v54H92z"/>
+    <path fill="#7ee2a8" d="M38 150h54v54H38zM92 150h54v54H92zM146 150h54v54h-54zM146 96h54v54h-54z"/>
+  </g>
+</svg>

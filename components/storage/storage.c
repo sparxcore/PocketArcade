@@ -383,6 +383,24 @@ static bool execute_operation(operation_t *op)
         return ok;
     }
 
+    /*
+     * Application records add one namespace directory beneath data/apps.
+     * Create that directory on this worker so runtime callbacks still only
+     * enqueue writes and never mutate the filesystem directly.
+     */
+    if (strncmp(op->path, "data/apps/", strlen("data/apps/")) == 0) {
+        char parent[256];
+        strlcpy(parent, destination, sizeof(parent));
+        char *separator = strrchr(parent, '/');
+        if (!separator) return false;
+        *separator = '\0';
+        if (mkdir(parent, 0775) != 0 && errno != EEXIST) {
+            ESP_LOGE(TAG, "Could not create application data directory: %d",
+                     errno);
+            return false;
+        }
+    }
+
     char temporary[264];
     snprintf(temporary, sizeof(temporary), "%s.tmp", destination);
     FILE *file = fopen(temporary, "wb");

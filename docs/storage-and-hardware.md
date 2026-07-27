@@ -3,8 +3,9 @@
 ## Two tiers
 
 The complete shell, CSS, JavaScript client, setup/lobby/recovery UI, protocol
-constants, and captive responses are gzip-compressed into firmware. They never
-read from SD and cannot be replaced by card content.
+constants, captive welcome page, and its compressed portrait/landscape artwork
+are embedded in firmware. They never read from SD and cannot be replaced by
+card content.
 
 NVS stores only the local device secret and is reserved for small system
 configuration/migration values. It is not the user database.
@@ -105,8 +106,8 @@ FAT metadata.
 
 Games are prepared independently and copied to `/apps/<application-id>/`. The
 reference package is `sdcard-example/apps/tic-tac-toe/` and contains
-`manifest.json`, `app.js`, and `app.css`. Firmware validates and caches
-manifests; card content cannot shadow the flash-hosted shell.
+`manifest.json` plus `client/` and `server/` directories. Firmware validates
+and caches manifests; card content cannot shadow the flash-hosted shell.
 
 Mount failure, corruption, full-card writes, queue exhaustion, and removal are
 logged and reported without taking down Wi-Fi, HTTP, embedded UI, RAM profiles,

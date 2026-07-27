@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 2,
+  "id": "pocket-ludo",
+  "name": "Pocket Ludo",
+  "description": "Race four lively pawns home in a colourful multiplayer Ludo showdown.",
+  "version": "1.0.8",
+  "minPlatformVersion": "0.3.0",
+  "kind": "game",
+  "client": {
+    "entrypoint": "client/app.js",
+    "stylesheet": "client/app.css"
+  },
+  "runtime": {
+    "type": "lua",
+    "entrypoint": "server/main.lua",
+    "mode": "event"
+  },
+  "multiplayer": {
+    "minPlayers": 2,
+    "maxPlayers": 4,
+    "spectators": true,
+    "lateJoin": "spectator",
+    "reconnectGraceMs": 30000
+  },
+  "protocol": {
+    "version": 1
+  },
+  "capabilities": [
+    "match.seats",
+    "match.results"
+  ]
+}

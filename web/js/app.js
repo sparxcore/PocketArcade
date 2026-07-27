@@ -5,6 +5,7 @@ const byId = (id) => document.getElementById(id);
 const views = ["loading-view", "setup-view", "lobby-view", "fatal-view"];
 const loadedAppScripts = new Set();
 let unmountActiveApp = null;
+let activeAppSession = null;
 
 function showView(id) {
   for (const view of views) byId(view).hidden = view !== id;
@@ -207,9 +208,62 @@ function renderChat(messages) {
   if (nearBottom || messages.length <= 1) list.scrollTop = list.scrollHeight;
 }
 
+function setAppFullscreen(session, enabled) {
+  if (!session || session !== activeAppSession) return false;
+  const fullscreen = Boolean(enabled);
+  if (session.fullscreen === fullscreen) return true;
+  if (session.changingFullscreen) return false;
+  session.changingFullscreen = true;
+  try {
+    session.fullscreen = fullscreen;
+    document.body.classList.toggle("app-fullscreen", fullscreen);
+    byId("active-app-panel").classList.toggle("is-fullscreen", fullscreen);
+    byId("active-app-host").classList.toggle("is-fullscreen", fullscreen);
+    byId("exit-app-fullscreen").hidden = !fullscreen;
+    for (const callback of [...session.fullscreenListeners]) {
+      try {
+        callback(fullscreen);
+      } catch (error) {
+        console.error("Game fullscreen callback failed.", error);
+      }
+    }
+  } finally {
+    session.changingFullscreen = false;
+  }
+  return true;
+}
+
+function appDisplayCapability(session) {
+  return Object.freeze({
+    requestFullscreen: () => setAppFullscreen(session, true),
+    exitFullscreen: () => setAppFullscreen(session, false),
+    isFullscreen: () =>
+      session === activeAppSession && session.fullscreen,
+    onFullscreenChange: (callback) => {
+      if (session !== activeAppSession) return () => {};
+      session.fullscreenListeners.add(callback);
+      return () => session.fullscreenListeners.delete(callback);
+    },
+  });
+}
+
 function closeApp() {
-  if (unmountActiveApp) unmountActiveApp();
+  const session = activeAppSession;
+  if (session) setAppFullscreen(session, false);
+  activeAppSession = null;
+  document.body.classList.remove("app-fullscreen");
+  byId("active-app-panel").classList.remove("is-fullscreen");
+  byId("active-app-host").classList.remove("is-fullscreen");
+  byId("exit-app-fullscreen").hidden = true;
+  const cleanup = unmountActiveApp;
   unmountActiveApp = null;
+  if (typeof cleanup === "function") {
+    try {
+      cleanup();
+    } catch (error) {
+      console.error("Game cleanup failed.", error);
+    }
+  }
   byId("active-app-host").replaceChildren();
   byId("active-app-panel").hidden = true;
   byId("app-error").textContent = "";
@@ -232,6 +286,13 @@ function loadScript(url) {
 
 async function openApp(app) {
   closeApp();
+  const session = {
+    appId: app.id,
+    fullscreen: false,
+    changingFullscreen: false,
+    fullscreenListeners: new Set(),
+  };
+  activeAppSession = session;
   const panel = byId("active-app-panel");
   panel.hidden = false;
   byId("active-app-title").textContent = app.name;
@@ -246,13 +307,24 @@ async function openApp(app) {
       document.head.append(style);
     }
     await loadScript(app.entrypointUrl);
+    if (activeAppSession !== session) return;
     const module = window.PocketArcadeApps?.[app.id];
     if (!module || typeof module.mount !== "function") {
       throw new Error("This SD application has an invalid entrypoint.");
     }
     byId("app-error").textContent = "";
-    unmountActiveApp = module.mount(byId("active-app-host"), arcade) || null;
+    const appFacade = arcade.createAppFacade(
+      app.id, appDisplayCapability(session));
+    const cleanup = module.mount(byId("active-app-host"), appFacade);
+    if (activeAppSession === session) {
+      unmountActiveApp = typeof cleanup === "function" ? cleanup : null;
+    } else if (typeof cleanup === "function") {
+      cleanup();
+    }
   } catch (error) {
+    if (activeAppSession !== session) return;
+    setAppFullscreen(session, false);
+    activeAppSession = null;
     byId("app-error").textContent = error.message;
   }
 }
@@ -552,6 +624,16 @@ byId("delete-button").addEventListener("click", async () => {
 });
 
 byId("close-app").addEventListener("click", closeApp);
+byId("exit-app-fullscreen").addEventListener("click", () => {
+  const session = activeAppSession;
+  if (!session || !setAppFullscreen(session, false)) return;
+  byId("close-app").focus();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !activeAppSession?.fullscreen) return;
+  event.preventDefault();
+  setAppFullscreen(activeAppSession, false);
+});
 byId("retry-button").addEventListener("click", start);
 
 start();

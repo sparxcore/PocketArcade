@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="PocketRacers icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#193443"/>
+      <stop offset="1" stop-color="#0d141b"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="54" fill="url(#bg)"/>
+  <path d="M42 177c16-50 39-91 78-109 35-16 71-6 94 21" fill="none" stroke="#d9dde1" stroke-width="38" stroke-linecap="round"/>
+  <path d="M42 177c16-50 39-91 78-109 35-16 71-6 94 21" fill="none" stroke="#4d5359" stroke-width="27" stroke-linecap="round"/>
+  <g transform="translate(139 118) rotate(-29)">
+    <ellipse cx="-3" cy="6" rx="43" ry="23" fill="#000" opacity=".28"/>
+    <rect x="-30" y="-22" width="11" height="9" rx="3" fill="#111519"/>
+    <rect x="18" y="-22" width="11" height="9" rx="3" fill="#111519"/>
+    <rect x="-30" y="13" width="11" height="9" rx="3" fill="#111519"/>
+    <rect x="18" y="13" width="11" height="9" rx="3" fill="#111519"/>
+    <path d="M39 0 24-18h-45L-39-11v22l18 7h45z" fill="#ef5350" stroke="#ffb2ac" stroke-width="3"/>
+    <path d="m17-12-9-4H-8l-10 4v24l10 4H8l9-4z" fill="#1c3040"/>
+    <rect x="-24" y="-3" width="49" height="6" rx="3" fill="#55d7f2"/>
+  </g>
+  <path d="M35 211h186" stroke="#55d7f2" stroke-width="10" stroke-linecap="round"/>
+</svg>

@@ -1,166 +1,162 @@
-# PocketArcade game development and deployment guide
+# PocketArcade game development guide
 
-This document defines how a game integrates with PocketArcade, what an
-independently prepared SD-card package can do in firmware 0.1, and the platform
-work still required for independently deployable four-player and realtime
-games.
+This guide describes the game-package contract implemented by PocketArcade
+firmware 0.3.0. Event-driven and fixed-tick multiplayer games can keep their
+browser client and authoritative Lua rules entirely on the SD card. They do
+not need game-specific firmware code.
 
-The distinction between **implemented** and **proposed** behaviour is
-important:
+The [Tic-Tac-Toe package](../sdcard-example/apps/tic-tac-toe/) is the
+reference implementation.
 
-- **0.1 contract** means the repository and flashed firmware support it now.
-- **Target contract** means it is the intended Game SDK design, but it must not
-  be used by a released game until the corresponding platform work is
-  implemented.
+The [PocketBlocks package](../sdcard-example/apps/pocketblocks/) is the
+fixed-tick example. It exercises the Phase 3 scheduler, compact snapshots,
+sequencing, coalescing, and recovery behavior. Reference packages illustrate
+the contract, but new games must also follow the lifecycle, resource, and test
+requirements in this guide.
 
-Tic-Tac-Toe is the reference 0.1 package. Its browser presentation is
-independently copied to the SD card, but its authoritative rules are currently
-compiled into firmware. PocketArcade 0.1 does not execute arbitrary server code
-from an SD card.
+## Package layout
 
-## 1. Capability summary
-
-| Capability | Firmware 0.1 | Work required |
-|---|---|---|
-| Discover a game copied to the SD card | Yes | — |
-| Serve a game's JavaScript, CSS, images, and audio | Yes | — |
-| Mount/unmount a game inside the lobby | Yes | — |
-| Reuse the authenticated system WebSocket | Yes | — |
-| Read public current-profile and presence data | Yes | Formal SDK facade |
-| Deploy new authoritative game rules without reflashing | No | Generic runtime or sandboxed server scripts |
-| Generic game commands and events | No | App-aware WebSocket dispatcher |
-| Two-player Tic-Tac-Toe plus spectators | Yes | It is hard-coded |
-| Generic one-to-four-player seats | No | Match/session service |
-| One presence entry for multiple tabs | Yes | Game reconnection policy is still needed |
-| Full-page game presentation | No | Shell-controlled display modes |
-| Per-game wins/losses/draws/history | No | Generic result/statistics service |
-| Aggregate profile win count | Yes | Currently awarded only by compiled game logic |
-| Targeted/private game messages | No | Per-profile/per-connection sending |
-| Realtime simulation tick, clock sync, and snapshots | No | Realtime transport/runtime work |
-| Isolation from the system page and session token | No | Sandboxed game host and capability bridge |
-| Offline game validator and browser test harness | No | Game SDK tooling |
-
-The default network capacity—eight Wi-Fi stations, ten tracked WebSockets, and
-twelve HTTP/WebSocket sockets—is sufficient for a basic four-phone test.
-It does not by itself make a game four-player capable. Multiple tabs,
-spectators, asset downloads, and reconnecting sockets must also fit those
-bounds and require hardware capacity testing.
-
-## 2. Current SD package contract
-
-### 2.1 Directory layout
-
-One game occupies exactly one application namespace:
+Put one complete game beneath `/apps/<application-id>/`:
 
 ```text
-/apps/
-└── example-racer/
-    ├── manifest.json
-    ├── app.js
-    ├── app.css
-    ├── images/
-    │   ├── track.webp
-    │   └── car-blue.svg
-    └── audio/
-        └── countdown.ogg
+/apps/example-game/
+├── manifest.json
+├── client/
+│   ├── app.js
+│   └── app.css
+├── assets/
+│   └── icon.svg
+└── server/
+    └── main.lua
 ```
 
-Runtime data does not belong beside executable assets. Future platform-managed
-game data belongs under:
+Only `manifest.json`, the client entrypoint, and the Lua entrypoint are
+required. The stylesheet and other assets are optional.
 
-```text
-/data/apps/example-racer/
-```
-
-Games must never write directly into `/apps`, `/data/profiles`, another game's
-data directory, or a system namespace.
-
-### 2.2 Application ID
-
-The directory and manifest `id` must match after the directory name is
-normalised to lowercase. Use lowercase directly to avoid ambiguity.
-
-An ID:
+The application ID:
 
 - is 1–48 bytes;
-- contains only `a`–`z`, `0`–`9`, and `-`;
-- is stable for the lifetime of the game;
-- must not be reused for an unrelated game.
+- contains only lowercase `a`–`z`, digits, and `-`;
+- must match the lowercase-normalised package directory name;
+- should remain stable across releases of the game.
 
-Examples:
+Use the exact lowercase ID for both names. Do not accidentally copy an extra
+directory level such as `/apps/example-game/example-game/manifest.json`.
+
+Manifest and asset paths are relative to the package. Absolute paths, `.` or
+`..` segments, empty segments, backslashes, control characters, and URL
+encoding are rejected. Client and runtime paths are at most 96 bytes.
+
+Runtime data does not belong in the package directory. With the appropriate
+capability, firmware stores it beneath:
 
 ```text
-tic-tac-toe
-four-karts
-maze2
+/data/apps/<application-id>/
 ```
 
-The validator rejects absolute paths, empty path segments, `.`, `..`,
-backslashes, control characters, percent-encoded asset paths, and paths which
-escape the application directory.
+## Manifest version 2
 
-### 2.3 Manifest version 1
-
-Firmware 0.1 accepts a manifest no larger than 4096 bytes:
+Use this as a starting point for an event-driven game:
 
 ```json
 {
-  "manifestVersion": 1,
-  "id": "example-racer",
-  "name": "Example Racer",
-  "description": "A four-player top-down race.",
-  "entrypoint": "app.js",
-  "stylesheet": "app.css",
-  "kind": "game"
+  "manifestVersion": 2,
+  "id": "example-game",
+  "name": "Example Game",
+  "description": "A short launcher description.",
+  "version": "1.0.0",
+  "minPlatformVersion": "0.3.0",
+  "kind": "game",
+  "client": {
+    "entrypoint": "client/app.js",
+    "stylesheet": "client/app.css"
+  },
+  "runtime": {
+    "type": "lua",
+    "entrypoint": "server/main.lua",
+    "mode": "event"
+  },
+  "multiplayer": {
+    "minPlayers": 2,
+    "maxPlayers": 4,
+    "spectators": true,
+    "lateJoin": "spectator",
+    "reconnectGraceMs": 30000
+  },
+  "protocol": {
+    "version": 1
+  },
+  "capabilities": [
+    "match.seats",
+    "match.results"
+  ]
 }
 ```
 
-| Field | Required | 0.1 constraint |
-|---|---:|---|
-| `manifestVersion` | Yes | Number, exactly `1` |
-| `id` | Yes | Valid ID, at most 48 bytes, matching directory |
-| `name` | Yes | String, at most 64 bytes |
-| `description` | No | String or null, at most 160 bytes |
-| `entrypoint` | Yes | Safe relative path, at most 96 bytes, file must exist |
-| `stylesheet` | No | Safe relative path, at most 96 bytes; omitted if unreadable |
-| `kind` | No | String or null, at most 16 bytes; defaults to `application` |
+### Manifest fields
 
-`entrypointUrl` and `stylesheetUrl` are accepted as compatibility aliases, but
-new packages should use the relative fields above. The catalogue currently
-caches at most 12 valid applications. Unknown manifest fields are ignored.
+| Field | Requirement |
+|---|---|
+| `manifestVersion` | Integer `2` for a Lua game |
+| `id` | Valid application ID matching the package directory |
+| `name` | Required string, at most 64 bytes |
+| `description` | Optional string or `null`, at most 160 bytes |
+| `version` | Required three-part numeric version, for example `1.2.0`; at most 31 bytes |
+| `minPlatformVersion` | Required three-part numeric version no newer than the firmware |
+| `kind` | Must be `"game"` for the game dispatcher to admit joins |
+| `client.entrypoint` | Required readable file inside the package |
+| `client.stylesheet` | Optional file inside the package |
+| `runtime.type` | Must be `"lua"` |
+| `runtime.entrypoint` | Required non-empty Lua source file inside the package |
+| `runtime.mode` | `"event"` or `"tick"` |
+| `runtime.tickRateHz` | Required positive integer in tick mode |
+| `multiplayer.minPlayers` | Positive integer |
+| `multiplayer.maxPlayers` | Positive integer, not lower than the effective minimum |
+| `multiplayer.spectators` | Boolean |
+| `multiplayer.lateJoin` | `"spectator"` or `"reject"` |
+| `multiplayer.reconnectGraceMs` | Non-negative integer |
+| `protocol.version` | Integer `1` |
+| `capabilities` | Required array containing only supported names |
 
-The catalogue is scanned at boot and after a successful mount, not for every
-HTTP request. A malformed package is omitted without preventing the system UI
-or other games from loading.
+The manifest is limited to 4096 bytes. The catalogue currently holds up to 12
+valid applications.
 
-### 2.4 Served assets
+Requested values are never trusted directly. Firmware clamps player counts to
+four, tick rate to 30 Hz, and reconnect grace to 60 seconds. A request which is
+still inconsistent after clamping, such as an effective minimum greater than
+the effective maximum, is rejected. The `/api/v1/apps` catalogue reports
+effective values.
 
-A valid package is available only below:
+The supported capability names are:
 
-```text
-/apps/<application-id>/*
-```
+| Capability | Lua surface |
+|---|---|
+| `presence.read` | Accepted and reserved; no additional Lua method is exposed in 0.3.0 |
+| `match.seats` | `match.players()` and `match.start_countdown()` |
+| `match.results` | `match.finish(result)` |
+| `storage.app-data` | `storage.read()` and `storage.write()` |
 
-Recognised MIME types include JavaScript, CSS, HTML, JSON, SVG, PNG, JPEG,
-WebP, MP3, and Ogg. Other extensions are served as
-`application/octet-stream`. Assets are streamed from FATFS in 1024-byte chunks
-with a 60-second revalidation cache policy.
+An unknown capability rejects the package. Transport, clock, random, and
+bounded logging do not currently require a manifest capability.
 
-Do not depend on:
+Manifest v1 remains readable for old launcher applications, but it does not
+describe an SD-hosted Lua runtime. New authoritative games must use version 2.
 
-- the internet, a CDN, external fonts, npm packages, or remote APIs;
-- direct filesystem paths such as `/sdcard/...`;
-- application assets shadowing `/`, `/system/*`, `/api/v1/*`, or `/ws`;
-- case-insensitive URLs, even though FAT behaviour may vary;
-- an asset remaining readable after the administrator safely ejects the card.
+### Why a package might not appear
 
-Keep files compact. Pre-compress images and audio on the development computer,
-avoid large sprite sheets, and load only what the current view needs.
+An invalid package is omitted from the launcher without affecting other
+applications. The serial log uses the `APPS` tag and reports reasons such as a
+directory/ID mismatch, missing entrypoint, unsupported protocol, invalid
+runtime metadata, or oversized script.
 
-## 3. Current browser entrypoint pattern
+The required client and runtime files must already exist when the catalogue is
+scanned. A missing optional stylesheet is omitted rather than preventing the
+application from appearing.
 
-The entrypoint is a classic script loaded into the existing system document.
-It registers one module without opening another WebSocket:
+## Browser client
+
+The client entrypoint is a classic script. It registers one module under its
+application ID:
 
 ```javascript
 "use strict";
@@ -168,24 +164,112 @@ It registers one module without opening another WebSocket:
 (() => {
   window.PocketArcadeApps = window.PocketArcadeApps || {};
 
-  window.PocketArcadeApps["example-racer"] = {
+  window.PocketArcadeApps["example-game"] = {
     mount(container, arcade) {
+      let activeMatch = null;
+      let latestSnapshotRevision = -1;
+      let result = null;
+
       const root = document.createElement("section");
-      root.className = "example-racer";
-      root.textContent = "Loading race…";
+      root.className = "example-game";
+
+      const status = document.createElement("p");
+      status.textContent = "Choose Join to play.";
+
+      const join = document.createElement("button");
+      join.type = "button";
+      join.textContent = "Join game";
+      join.addEventListener("click", () => {
+        arcade.game.join("example-game");
+      });
+
+      const ready = document.createElement("button");
+      ready.type = "button";
+      ready.textContent = "Ready";
+      ready.addEventListener("click", () => {
+        if (activeMatch) arcade.game.ready(activeMatch.matchId);
+      });
+
+      const leave = document.createElement("button");
+      leave.type = "button";
+      leave.textContent = "Leave";
+      leave.addEventListener("click", () => {
+        if (activeMatch) arcade.game.leave(activeMatch.matchId);
+      });
+
+      root.append(status, join, ready, leave);
       container.replaceChildren(root);
 
-      const stopPresence = arcade.on("presence.changed", (players) => {
-        // Render public player information with textContent.
+      function renderGame(payload) {
+        // Render only the supplied authoritative payload.
+        void payload;
+      }
+
+      function clearMatchState() {
+        activeMatch = null;
+        latestSnapshotRevision = -1;
+        result = null;
+        renderGame(null);
+        status.textContent = "Choose Join to play.";
+      }
+
+      function acceptMatch(match) {
+        if (match.you?.role === "none") {
+          if (!activeMatch || match.matchId === activeMatch.matchId) {
+            clearMatchState();
+          }
+          return;
+        }
+        if (!activeMatch || match.matchId !== activeMatch.matchId) {
+          clearMatchState();
+        }
+        activeMatch = match;
+        status.textContent = `${match.state}: ${match.you.role}`;
+      }
+
+      const stopMatch = arcade.game.onMatch((match) => {
+        acceptMatch(match);
       });
 
-      const stopState = arcade.on("game.example-racer.state", (state) => {
-        // This event requires matching firmware support in 0.1.
+      const stopSnapshot = arcade.game.onSnapshot((snapshot) => {
+        if (!activeMatch || snapshot.matchId !== activeMatch.matchId) return;
+        const revision = Number(snapshot.revision);
+        if (!Number.isFinite(revision) ||
+            revision < latestSnapshotRevision) return;
+        latestSnapshotRevision = revision;
+        renderGame(snapshot.payload);
       });
+
+      const stopResult = arcade.game.onResult((nextResult) => {
+        if (!activeMatch || nextResult.matchId !== activeMatch.matchId) return;
+        result = nextResult;
+        status.textContent = "Match finished.";
+      });
+
+      const stopError = arcade.game.onError((error) => {
+        if (error.matchId &&
+            (!activeMatch || error.matchId !== activeMatch.matchId)) return;
+        if (error.code === "match_not_found") {
+          clearMatchState();
+        }
+        status.textContent = error.message;
+      });
+
+      const cachedMatch = arcade.game.currentMatch();
+      if (cachedMatch && cachedMatch.you?.role !== "none") {
+        acceptMatch(cachedMatch);
+        if (cachedMatch.state !== "finished") {
+          arcade.game.requestSnapshot(cachedMatch.matchId);
+        }
+      }
 
       return () => {
-        stopPresence();
-        stopState();
+        stopMatch();
+        stopSnapshot();
+        stopResult();
+        stopError();
+        activeMatch = null;
+        result = null;
         container.replaceChildren();
       };
     },
@@ -193,683 +277,911 @@ It registers one module without opening another WebSocket:
 })();
 ```
 
-The module contract is:
+`mount(container, arcade)` may return a cleanup function. Cleanup must
+unsubscribe callbacks, remove document-level listeners, stop audio and sensor
+access, cancel timers and animation frames, and release large buffers. Closing
+the view does not automatically leave a match; call `leave` if that is the
+game's intended behaviour.
+
+Insert nicknames and all other user-controlled values with `textContent` or
+equivalent safe DOM methods. Prefix every CSS selector with an
+application-specific root class so game styles do not alter the lobby.
+
+Capture an asset base while the script is evaluating:
+
+```javascript
+const assetBase = new URL(".", document.currentScript.src);
+const iconUrl = new URL("../assets/icon.svg", assetBase).href;
+```
+
+Do not depend on internet access, CDNs, remote fonts, analytics, or cloud
+services. Game assets are served only from `/apps/<application-id>/`.
+PocketArcade is a resource-constrained access point, so keep assets modest,
+load them before joining realtime play, and avoid HTTP polling or deferred
+asset downloads during a match.
+
+### Scoped Game SDK
+
+The `arcade` object contains a sanitised public `profile` getter and a frozen,
+application-scoped game facade:
 
 ```text
-window.PocketArcadeApps[manifest.id].mount(container, arcade)
-    -> optional cleanup function
+arcade.profile
+arcade.connectionStatus
+arcade.onConnection(callback)
+
+arcade.display.requestFullscreen()
+arcade.display.exitFullscreen()
+arcade.display.fullscreen
+arcade.display.onFullscreenChange(callback)
+
+arcade.game.join(appId)
+arcade.game.leave(matchId)
+arcade.game.ready(matchId)
+arcade.game.send(matchId, action, data)
+arcade.game.claimControl(matchId)
+arcade.game.requestSnapshot(matchId)
+arcade.game.currentMatch()
+arcade.game.currentSnapshot()
+
+arcade.game.onMatch(callback)
+arcade.game.onSnapshot(callback)
+arcade.game.onEvent(callback)
+arcade.game.onResult(callback)
+arcade.game.onError(callback)
 ```
 
-`mount` must:
+Each subscription returns an unsubscribe function. The callbacks are scoped to
+the current application, not to one match. A callback may therefore receive a
+delayed message from an earlier match of the same application. Every handler
+must compare `matchId` with the active match before changing UI or local state.
+Operations on a match owned by another application return `false`.
 
-- render only inside the supplied container;
-- install bounded listeners and timers;
-- tolerate the initial state being absent;
-- use `textContent`, attributes, or equivalent safe DOM APIs for user data;
-- remain usable on a narrow phone screen;
-- return a cleanup function.
+### Fullscreen presentation
 
-The cleanup function must:
-
-- unsubscribe every `arcade.on` listener;
-- cancel timers and animation frames;
-- stop audio and camera/sensor access;
-- remove document-level event listeners;
-- release large arrays, images, and canvases;
-- not send a game result merely because the view closed.
-
-Closing a game removes its stylesheet and calls cleanup. JavaScript cannot be
-unloaded from a browser document, and firmware 0.1 remembers that the script
-URL was loaded. Updating a package in place therefore requires a page reload
-before a changed `app.js` is guaranteed to execute. This is a platform gap,
-not a versioning mechanism games should work around.
-
-### 3.1 CSS and asset pattern
-
-Firmware 0.1 inserts the optional stylesheet into the system document. Prefix
-every selector with an application-specific root class:
-
-```css
-.example-racer {
-  display: grid;
-  min-width: 0;
-}
-
-.example-racer .race-status {
-  color: #f8f6ff;
-}
-```
-
-Do not style `body`, generic elements, `.primary`, `.card`, system IDs, or
-another game's classes. Avoid fixed positioning in the current embedded mode.
-Use responsive dimensions, safe contrast, visible focus states, touch targets
-of roughly 44 CSS pixels, and `prefers-reduced-motion`.
-
-Capture an asset base URL while the entrypoint is evaluating:
+Games can explicitly ask the PocketArcade shell to use the complete browser
+viewport:
 
 ```javascript
-(() => {
-  const assetBase = new URL(".", document.currentScript.src);
+const stopFullscreen = arcade.display.onFullscreenChange((fullscreen) => {
+  root.classList.toggle("fullscreen", fullscreen);
+});
 
-  // Later, inside mount:
-  // image.src = new URL("images/track.webp", assetBase).href;
-})();
-```
+playButton.addEventListener("click", () => {
+  arcade.display.requestFullscreen();
+});
 
-This keeps staging paths out of the source. Do not use a Windows path, an SD
-mount path, a `file:` URL, or a remote URL. An HTML file may be stored as an
-asset, but manifest version 1 loads JavaScript as the entrypoint; it does not
-navigate the shell to that HTML file.
-
-### 3.2 Available client state
-
-The object passed as `arcade` currently exposes:
-
-| Surface | Purpose |
-|---|---|
-| `arcade.profile` | Current public profile; never mutate it directly |
-| `arcade.players` | Map of online public profiles keyed by profile ID |
-| `arcade.storage` | Current storage state |
-| `arcade.on(name, callback)` | Subscribe; returns an unsubscribe function |
-| `arcade.send(type, payload)` | Send a version-1 message on the shared socket |
-| `arcade.connectionStatus` | Current system connection state |
-
-It also contains Tic-Tac-Toe-specific methods and cached state. Those methods
-are reference implementation details, not a generic game SDK.
-
-Games must not:
-
-- instantiate `WebSocket`, duplicate the system handshake, or poll presence;
-- read, store, print, or transmit `arcade.token`;
-- send player IDs as proof of identity;
-- change profile, storage, or system UI state through undocumented internals;
-- report their own win as an authoritative fact;
-- use `innerHTML` with nicknames, chat, or any other user-controlled value.
-
-Although `arcade.send()` can transmit any string, firmware 0.1 rejects message
-types which are not explicitly compiled into `websocket.c`. An SD-only game
-cannot add a new server command today.
-
-### 3.3 Connection and error pattern
-
-A game should render its most recent authoritative snapshot while disconnected
-but disable state-changing controls:
-
-```javascript
-let connected = arcade.connectionStatus === "connected";
-
-const stopConnection = arcade.on("connection.changed", (status) => {
-  connected = status === "connected";
-  moveButton.disabled = !connected || !isMoveCurrentlyLegal;
-  statusNode.textContent = connected
-    ? currentGameStatus
-    : "Reconnecting…";
+menuButton.addEventListener("click", () => {
+  arcade.display.exitFullscreen();
 });
 ```
 
-After reconnection, wait for the platform's fresh snapshot. Do not invent a
-result from locally cached state and do not create a second player because a
-socket changed. Show feature errors in the game view and keep them bounded.
-Cleanup must unsubscribe the connection listener too.
+`requestFullscreen()` and `exitFullscreen()` return `true` only while that
+application is the active mounted view. `arcade.display.fullscreen` reports
+the current shell state. The callback runs when the state changes.
+`onFullscreenChange()` returns an unsubscribe function.
 
-## 4. Current shared protocol
+This is PocketArcade's reliable, viewport-filling presentation mode; it does
+not invoke the browser Fullscreen API and therefore does not depend on browser
+permission or a user-gesture policy. The game decides when it is useful. For
+example, enter when active play begins and exit when returning to a menu. Do
+not request it unconditionally from `mount()` merely because the application
+was opened.
 
-Every game continues to use the one authenticated `/ws` connection and the
-standard envelope:
+PocketArcade always presents a shell-owned **Exit fullscreen** button, and the
+Escape key also exits on keyboards. Closing the game, switching applications,
+losing the active profile, or a failed mount restores the normal shell
+automatically. A facade retained by an unmounted application cannot change the
+display mode.
+
+Fullscreen changes the size of the supplied container. Use responsive CSS,
+percentage sizing, or `ResizeObserver`; do not cache the viewport dimensions
+at mount time. Keep important game controls clear of the top-right safe area,
+where the shell exit button is displayed. A game may call
+`arcade.display.exitFullscreen()` during cleanup, but shell cleanup does not
+depend on it.
+
+`currentMatch()` and `currentSnapshot()` are cache lookups for convenient view
+restoration. They are not proof of current membership: a cached match may be
+finished or may have `you.role == "none"` after an explicit leave. Validate
+`you.role` and `matchId` before using cached state.
+
+When the WebSocket closes, the SDK clears its match, snapshot, and input
+sequence caches before reconnecting. It emits one final client-generated
+`onMatch` update for each previously cached match with `state == "closed"`,
+`you.role == "none"`, and `you.controller == false`. Treat every other field
+in that synthetic update, including a retained seat number, as stale. During
+the reconnect attempt `currentMatch()` and `currentSnapshot()` return `null`.
+Do not preserve the old match ID elsewhere or send Ready, Leave, control, or
+game commands until a fresh authoritative `onMatch` update restores
+membership.
+
+The command methods return a boolean indicating whether the browser could send
+the request. They are not promises and do not mean the firmware accepted the
+operation. Handle authoritative state through snapshots and handle rejection
+through `onError`.
+
+An error with code `match_not_found` means the referenced match is no longer
+authoritative. It may have finished, faulted, closed, or been replaced while a
+request was in flight. If the error refers to the active match, clear its local
+state and either wait for authoritative reconnect state or offer a fresh
+`arcade.game.join()` action. Never retry the request with the old match ID.
+
+The facade does not expose authentication tokens, connection IDs, raw socket
+methods, chat, administrative APIs, or direct storage mutation. In 0.3.0 the
+classic script still executes in the system document, so installed browser
+code must be trusted. A sandboxed-frame capability bridge is planned for
+Phase 5.
+
+### Match messages and lifecycle
+
+`onMatch` receives an application-neutral membership snapshot:
 
 ```json
 {
-  "v": 1,
-  "type": "game.tictactoe.move",
-  "id": 41,
-  "payload": {
-    "cell": 4
+  "appId": "example-game",
+  "appVersion": "1.0.0",
+  "matchId": "m_1234abcd",
+  "state": "waiting",
+  "revision": 4,
+  "seats": [
+    {
+      "seat": 1,
+      "ready": true,
+      "connected": true,
+      "player": {
+        "profileId": "p_...",
+        "nickname": "Alex",
+        "wins": 3,
+        "avatarUrl": "/api/v1/avatars/p_....jpg"
+      }
+    },
+    {
+      "seat": 2,
+      "ready": false,
+      "connected": true,
+      "player": {
+        "profileId": "p_...",
+        "nickname": "Sam",
+        "wins": 1,
+        "avatarUrl": null
+      }
+    },
+    {
+      "seat": 3,
+      "ready": false,
+      "connected": false,
+      "player": null
+    },
+    {
+      "seat": 4,
+      "ready": false,
+      "connected": false,
+      "player": null
+    }
+  ],
+  "spectators": [
+    {
+      "profileId": "p_...",
+      "nickname": "Taylor",
+      "wins": 0,
+      "avatarUrl": "/api/v1/avatars/p_....jpg"
+    }
+  ],
+  "you": {
+    "role": "player",
+    "seat": 1,
+    "controller": true
   }
 }
 ```
 
-Authentication, reconnection, sequence IDs, presence, and storage events are
-owned by `PocketArcadeClient`. A game subscribes to the high-level events it
-needs.
+Every occupied `seats[].player` and every entry in `spectators[]` uses the same
+public match-profile shape: `profileId`, `nickname`, `wins`, and `avatarUrl`.
+`avatarUrl` is the system-relative profile-avatar endpoint when a photo exists
+and `null` otherwise. The SDK preserves this field in its cached and delivered
+`game.match` object. Reconnect/full membership updates use the same shape, and
+changing a profile photo while the match is active produces a new
+`game.match` revision. Rendering should still provide an initials fallback for
+`null` or an image-load failure.
 
-The current Tic-Tac-Toe firmware demonstrates the required authority pattern:
+The authoritative firmware states visible in this release are `waiting`,
+`countdown`, `playing`, and `finished`. The SDK additionally emits the
+client-only state `closed` when a WebSocket connection is lost, as described
+above. A match begins in `waiting`. When at least `minPlayers` seats are
+occupied and every occupied player is ready, firmware changes it to `playing`.
+Readiness cannot currently be withdrawn.
 
-1. The browser requests an action.
-2. The WebSocket layer supplies the authenticated profile.
-3. The server validates membership, state, turn, and action.
-4. The server mutates authoritative RAM state.
-5. The server broadcasts a complete snapshot.
-6. The server records a win once, after detecting the transition to a won
-   state.
-7. Profile persistence is queued outside the WebSocket callback.
+Lifecycle is not strictly forward-only. A membership change can make the
+readiness/minimum-player condition false and move a non-finished match back to
+`waiting`. In particular, a player leaving during a game-specific countdown
+can stop the tick scheduler before that countdown completes. Lua and browser
+state must both tolerate `playing → waiting → playing`, including replacement
+players occupying newly open seats.
 
-Seats are keyed by profile ID, not connection ID, so two tabs cannot occupy two
-seats. Spectators receive the same public snapshot.
+Seats are keyed by authenticated profile ID, not browser tab or socket. Joining
+again is idempotent. A second tab observes the same seat and receives match
+state, but only the tab holding the controller lease may send commands.
+`claimControl` transfers that lease and requests a fresh snapshot.
 
-Use this pattern for compiled firmware games, but do not copy its
-`game.tictactoe.*` namespace for another game.
+When a controller disconnects, another connected tab for that profile becomes
+controller automatically. Otherwise the seat remains reserved for
+`reconnectGraceMs`. Reconnection restores the same seat and triggers a targeted
+full snapshot. Explicit `leave` releases the seat immediately.
 
-## 5. Developing a game against firmware 0.1
+After a successful explicit leave, firmware sends the leaving connection one
+last `game.match` update for the old match with `you.role` set to `"none"`,
+`you.seat` set to `null`, and `you.controller` set to `false`. This update is
+the authoritative leave acknowledgement. Clear that match's snapshots,
+revision watermark, result, input state, timers, and controls. Do not keep the
+old match truthy merely because a `game.match` object still exists.
 
-There are two supported development levels.
+Players may join an open seat only while the match is `waiting`. Later joins
+follow `lateJoin`: they become bounded spectators when that is enabled, or are
+rejected. The default firmware capacity is four spectator profiles. Spectators
+receive snapshots and events but never player command authority.
 
-### 5.1 Presentation-only or local game
+In a game where `minPlayers` is lower than `maxPlayers`, do not automatically
+mark the first arrivals ready if the game must wait for every possible seat:
+the platform starts as soon as the effective minimum and all currently
+occupied readiness conditions are met.
 
-The game can be entirely on the SD card if its state is local to one browser
-and it does not award trusted results. It may use public profile/presence
-information for display.
+### Commands, snapshots, and events
 
-### 5.2 Authoritative multiplayer game
-
-For 0.1, implement:
-
-1. The SD package using the module contract above.
-2. A dedicated firmware component which owns game state under a bounded lock.
-3. Namespaced constants in `protocol`.
-4. Validation and dispatch in the shared WebSocket component.
-5. Snapshot/event serialization containing public fields only.
-6. Presence-disconnect and profile-update hooks.
-7. Server-side result recording and queued persistence.
-8. Host tests plus multi-phone hardware acceptance tests.
-
-This requires rebuilding and flashing PocketArcade. It is not yet the desired
-fully independent deployment model.
-
-### 5.3 Package author checklist
-
-Before copying a 0.1 package:
-
-- manifest ID and directory match and use only `[a-z0-9-]+`;
-- manifest, entrypoint, and optional stylesheet are within their size/path
-  limits;
-- no external URL, framework, font, analytics, or cloud service is required;
-- all selectors are scoped below the game's root class;
-- user text is inserted with safe DOM methods;
-- one `mount` call creates one view and returns one complete cleanup function;
-- no direct WebSocket or session-token access exists;
-- buttons are disabled while disconnected or awaiting authority;
-- duplicate taps/commands are safe or carry a sequence/idempotency key;
-- reconnect starts from a server snapshot;
-- a second tab does not create another seat;
-- spectators cannot mutate player state;
-- SD removal closes or degrades the view without breaking the lobby;
-- every image/audio file is compressed and tested on the actual phone browser;
-- no browser-generated result is trusted.
-
-### 5.4 Separate game repository pattern
-
-A separately maintained game should keep PocketArcade-ready output in one
-copyable directory:
-
-```text
-four-karts/
-├── README.md
-├── package/
-│   └── four-karts/
-│       ├── manifest.json
-│       ├── app.js
-│       ├── app.css
-│       └── assets/
-├── src/
-├── tests/
-└── tools/
-    └── build-package.py
-```
-
-Only `package/four-karts/` is copied into the SD card's `/apps/` directory.
-Source maps, test fixtures, editor files, original artwork, build caches, and
-development credentials must stay outside the package. A build step is
-optional; when used, it must work offline and produce deterministic,
-self-contained vanilla browser assets. Keep the game repository's platform
-compatibility and deployment instructions beside its source.
-
-Once the target server runtime exists, the same package directory will also
-contain its declarative or sandboxed server files. Until then, keep the matching
-firmware component version documented in the game repository.
-
-## 6. Safe deployment
-
-1. Validate the package on the development computer.
-2. In PocketArcade, open **Profile → Admin → Eject SD card**.
-3. Wait until the UI says **Safe to remove SD card**.
-4. Remove the card and insert it into the computer.
-5. Copy the complete directory to `/apps/<application-id>/`.
-6. Safely eject the card from the computer.
-7. Reinsert it in PocketArcade.
-8. Choose **Profile → Admin → Mount SD card** when the board has no card-detect
-   pin.
-9. Confirm the game appears in `GET /api/v1/apps`.
-10. Open it on every participating device and test reconnect and spectator
-    behaviour.
-
-To replace a game, copy the complete package rather than partially editing live
-files. Never pull a mounted card. PocketArcade's safe-eject path rejects new
-writes, drains queued profile/chat operations, waits for active asset reads,
-and unmounts FATFS.
-
-Removing a game must not remove its data automatically. A later platform
-version should provide an explicit administrator uninstall/data-delete flow.
-
-## 7. Target Game SDK contract
-
-The following design is recommended for the next platform version. It is not
-accepted by the current manifest scanner.
-
-### 7.1 Versioned manifest
-
-```json
-{
-  "manifestVersion": 2,
-  "id": "four-karts",
-  "name": "Four Karts",
-  "version": "1.2.0",
-  "minPlatformVersion": "0.2.0",
-  "kind": "game",
-  "client": {
-    "entrypoint": "client/app.js",
-    "stylesheet": "client/app.css"
-  },
-  "display": {
-    "mode": "full-page",
-    "orientation": "landscape"
-  },
-  "multiplayer": {
-    "minPlayers": 2,
-    "maxPlayers": 4,
-    "spectators": true,
-    "lateJoin": "spectator"
-  },
-  "runtime": {
-    "type": "lua",
-    "entrypoint": "server/main.lua",
-    "tickRateHz": 20
-  },
-  "protocol": {
-    "version": 1
-  },
-  "capabilities": [
-    "presence.read",
-    "match.seats",
-    "profile.results.write",
-    "storage.app-data"
-  ]
-}
-```
-
-The platform must reject unsupported versions/capabilities before loading any
-game code. A catalogue entry should report why a package is incompatible
-instead of silently omitting every incompatibility.
-
-### 7.2 Stable, capability-limited client facade
-
-Games should receive a frozen facade rather than the complete system client:
+Send game intent, never claimed authoritative state:
 
 ```javascript
-const game = {
-  app: { id, version },
-  profile: { id, nickname, avatarUrl, colour, wins },
-  presence: {
-    list(),
-    subscribe(callback),
-  },
-  match: {
-    join(),
-    leave(),
-    send(action, data),
-    subscribe(callback),
-  },
-  ui: {
-    requestDisplayMode(mode),
-    exit(),
-    setBackHandler(callback),
-  },
-  assets: {
-    url(relativePath),
-  },
-};
+arcade.game.send(match.matchId, "move", {
+  direction: -1,
+});
 ```
 
-The token, raw WebSocket, administrative API, device identity, filesystem, and
-other games' data must not be present.
+`action` is 1–32 bytes. `data` must be an object and its compact JSON form must
+fit the advertised command limit. The SDK supplies a non-zero monotonic
+`inputSeq`; games do not supply profile identity or sequence numbers.
 
-### 7.3 Generic game messages
+Firmware derives identity from the authenticated WebSocket, checks membership
+and the controller lease, rejects stale sequences and excess command rate,
+then copies accepted work to a bounded queue. Lua never runs in the WebSocket
+callback.
 
-The shared socket should retain the system envelope and use a generic,
-server-routed game protocol:
+The command limit is one aggregate budget per player profile, not a separate
+budget for each button or action. Touch repeat, keyboard repeat, multitouch,
+initial presses, and one-shot actions all count. Coordinate repeat controls
+through one input scheduler and leave headroom below the advertised limit. For
+the default 20-command/second limit, do not configure two independently held
+controls which can together exceed 20. Stop repeat work on pointer cancellation,
+loss of control, view cleanup, connection loss, and `visibilitychange`, and
+show `rate_limited` and `queue_full` errors without continuing an input flood.
 
-Client command:
+`onSnapshot` receives:
 
 ```json
 {
-  "v": 1,
-  "type": "game.command",
-  "id": 73,
+  "appId": "example-game",
+  "matchId": "m_1234abcd",
+  "revision": 9,
+  "serverTick": 523801,
+  "ackInputSeq": 17,
   "payload": {
-    "appId": "four-karts",
-    "matchId": "m_a19f",
-    "action": "input",
-    "inputSeq": 118,
-    "data": {
-      "steer": -0.42,
-      "throttle": 1
+    "gameDefined": "state"
+  }
+}
+```
+
+The firmware validates the size of `payload` but does not interpret it.
+`revision` is monotonic only within one `matchId`; a fresh match starts a new
+revision sequence. Key local state by `(appId, matchId)`, reset its revision
+watermark whenever `matchId` changes, and reject envelopes which do not belong
+to the active match before comparing revisions. `serverTick` is current
+monotonic uptime in milliseconds, and `ackInputSeq` is the last command
+processed for the recipient's seat. The SDK uses acknowledgements to preserve
+sequencing across reconnects and controller transfer.
+
+`onEvent` receives the same common envelope plus `name`; its game-defined data
+is under `event.payload`. Events are suitable for transient effects. Snapshots
+must contain enough authoritative state to recover after a missed event,
+reconnect, or page reload.
+
+Apply the same active-`matchId` check to `onEvent`, `onResult`, and `onError`.
+Application scoping alone is insufficient because critical messages and a
+coalesced snapshot from an earlier match can still be in flight while the
+browser joins a fresh match.
+
+Event-mode snapshots and lifecycle/event/result messages use JSON. Tick-mode
+snapshots use the compact binary envelope documented in
+[the WebSocket protocol](websocket-protocol.md), while the SDK still delivers
+the same JavaScript object to `onSnapshot`. Each connection has a bounded
+critical-message ring and only one pending snapshot slot. A newer revision
+replaces obsolete unsent state, and repeated queue pressure closes only the
+slow connection.
+
+## Authoritative Lua server
+
+The server entrypoint must be non-empty Lua source text; precompiled bytecode
+is rejected. It returns one callback table without a metatable:
+
+```lua
+return {
+    init = function(context) end,
+    on_match_open = function(context) end,
+    on_player_join = function(context, player) end,
+    on_player_leave = function(context, player, reason) end,
+    on_player_update = function(context, player) end,
+    on_command = function(context, player, action, data, sequence) end,
+    on_tick = function(context, delta_ms) end,
+    on_snapshot = function(context, recipient) return {} end,
+    on_unload = function(context) end
+}
+```
+
+Every callback is optional, but a named field must be a function when present.
+`context` is a private table retained for the life of one match. Put all
+authoritative game state there or in Lua values reachable from it. One match
+has one isolated Lua state.
+
+Callback order for the first player is:
+
+```text
+load script → init → on_match_open → on_player_join → on_snapshot
+```
+
+In event mode, subsequent player events and accepted commands are followed by
+`on_snapshot` while the match remains active. In tick mode, commands only
+change authoritative state; `on_snapshot` runs on the firmware-controlled
+snapshot cadence. A targeted snapshot request calls `on_snapshot` with
+`{ profileId = "..." }`; automatic broadcast snapshots pass `nil` as the
+recipient.
+
+Only player seats produce `on_player_join`, `on_player_leave`, and
+`on_player_update`. Spectators are platform members but are not included in
+these callbacks or `match.players()`.
+
+Player callbacks run after the platform has committed the membership change.
+Consequently, the departing player is already absent from `match.players()`
+and `match.state()` may already have returned to `"waiting"` when
+`on_player_leave` runs. Reconcile the script's player table against
+`match.players()` inside player callbacks. Do not wait for `on_tick`, because
+tick-mode callbacks stop whenever the platform is not `"playing"`.
+
+Join, leave, and update player objects contain:
+
+```lua
+{
+    profileId = "p_...",
+    nickname = "Alex",
+    wins = 3,
+    persistent = true
+}
+```
+
+For `on_command`, the `player` argument deliberately contains only
+`profileId`. Resolve game roles from authoritative state keyed by that ID. The
+current leave reason is `"left"`.
+
+The game must choose and implement a departure policy for every game phase. For
+example, it may remove a waiting player, cancel and reset a pre-round
+countdown, or eliminate a player and finish an active round. Whatever policy is
+chosen, remove obsolete per-profile state once it is no longer needed and make
+the next `on_snapshot` describe the reconciled membership.
+
+### JSON-compatible Lua data
+
+Command data, snapshots, events, results, and stored values may contain:
+
+- `nil`, booleans, finite numbers, and strings;
+- tables with contiguous integer keys starting at 1, encoded as arrays;
+- tables with only string keys, encoded as objects.
+
+Functions, userdata, threads, non-finite numbers, sparse arrays, and
+mixed-keyed tables cannot cross the firmware boundary. Conversion depth is
+limited to 16.
+
+An empty Lua table encodes as an object. Also remember that assigning `nil` to
+an array element removes it. Use `false` for fixed empty slots:
+
+```lua
+local board = {
+    false, false, false,
+    false, false, false,
+    false, false, false
+}
+```
+
+### Keep authoritative state bounded
+
+The runtime memory quota applies to the complete Lua state, not just the
+current snapshot. Every table retained through `context`, a closure, or another
+reachable value counts even when it is never serialized.
+
+The allocator prefers optional PSRAM for Lua state and falls back to internal
+RAM when external memory is absent. The same 131,072-byte per-match quota is
+enforced in either case; a package must never depend on PSRAM being installed.
+Likewise, passing the 65,536-byte source-file check does not guarantee that a
+script will load: its compiled functions, constants, tables, and initial state
+must all fit the runtime quota.
+
+Set explicit limits for all histories, queues, caches, logs, replay data,
+random/piece sequences, and per-player records. Use fixed-size rings or prune
+old prefixes, remove departed players when their state is no longer required,
+and clear round-only data when a round restarts. Do not rely on an expected
+short match to make an otherwise unbounded structure safe.
+
+Keep the authoritative representation compact as well as the serialized
+snapshot. Test repeated join/leave cycles and a deliberately long match; a
+runtime which eventually reaches the memory quota is faulty even though the
+firmware safely contains the failure.
+
+Leave substantial headroom below the quota for temporary command values,
+snapshot tables, and serialization work. Serial logs report Lua high-water
+usage when a runtime loads and unloads, together with free internal and
+external heap at load time. Use those measurements during long-match and
+reconnect testing rather than estimating usage only from source size.
+
+### Runtime APIs
+
+The sandbox exposes these globals:
+
+```text
+match.players()
+match.state()
+match.start_countdown()
+match.finish(result)
+
+transport.broadcast_snapshot(payload)
+transport.send_snapshot(profileId, payload)
+transport.broadcast_event(name, payload)
+
+clock.tick()
+random.next()
+
+storage.read(key)
+storage.write(key, value)
+
+log.info(message)
+```
+
+`match.players()` returns occupied player seats in seat order:
+
+```lua
+{
+    {
+        profileId = "p_...",
+        nickname = "Alex",
+        wins = 3,
+        seat = 1,
+        connected = true
     }
-  }
 }
 ```
 
-Authoritative snapshot:
+`match.state()` returns the platform lifecycle string.
+`match.start_countdown()` changes a waiting match to `countdown`; it does not
+create a timer. Event-mode game rules remain responsible for deciding what the
+countdown means.
+
+In tick mode, `on_tick` runs only while the platform state is `"playing"`.
+Therefore, do not use the platform `"countdown"` state as a timer which expects
+`on_tick` to advance it. A realtime game should normally let readiness move the
+platform to `"playing"`, implement its visible countdown as a private Lua
+sub-phase, and reset or resolve that sub-phase immediately if a player callback
+reports that the platform has returned to `"waiting"`.
+
+The 50 ms Lua callback limit is a wall-clock fault-containment deadline, not a
+performance budget. It applies to every callback, including `on_tick` and
+`on_snapshot`, and elapsed time includes task preemption and optional-PSRAM
+latency. A tick callback must also finish comfortably inside its configured
+tick interval: 30 Hz provides only about 33 ms even though the hard callback
+deadline is 50 ms. Choose a rate which the worst-case simulation can sustain,
+leave scheduling headroom, and avoid large temporary tables, sorting, full
+state reconstruction, or repeated allocation in `on_tick`. The scheduler
+reports overruns and drops accumulated ticks instead of running an unbounded
+catch-up loop.
+
+### Realtime hot-path design
+
+Treat the tick interval as a deadline and reserve at least half of it for Wi-Fi,
+snapshot work, commands, and normal task preemption. A conservative target for
+the current ESP32 build is:
+
+| Tick rate | Tick interval | Suggested measured worst-case `on_tick` |
+|---:|---:|---:|
+| 10 Hz | 100 ms | 25 ms or less |
+| 15 Hz | about 67 ms | 25 ms or less |
+| 20 Hz | 50 ms | 25 ms or less |
+| 30 Hz | about 33 ms | 15 ms or less |
+
+These are engineering targets, not larger platform allowances: every callback
+still has the same 50 ms hard limit. Raising `tickRateHz` does not make Lua
+execute faster, and choosing 20 Hz because its interval equals the hard limit
+leaves no usable headroom.
+
+Keep the simulation and presentation paths separate:
+
+- `on_tick` should mutate compact authoritative state and do only the work
+  required for one simulation step;
+- `on_snapshot` should copy or quantise that state into the client payload at
+  the separately capped snapshot cadence;
+- do not move an expensive snapshot builder into `on_tick` merely to make
+  `on_snapshot` return a cache, because the combined physics-plus-copy tick can
+  still exceed its deadline;
+- do not call `transport.broadcast_snapshot()` periodically from `on_tick`;
+  automatic snapshots already run independently at up to 10 Hz.
+
+Maintain a bounded player list in `context` and reconcile it from
+`on_player_join`, `on_player_leave`, and `on_player_update`. Avoid calling
+`match.players()` several times in one callback or once per car/entity. The
+returned list is already in seat order; do not sort it again merely to obtain
+seat order. Ranking usually needs updating at snapshot cadence, on a material
+progress change, or at finish—not necessarily on every physics tick.
+
+For racing, maze, collision, and spatial simulations:
+
+- precompute static geometry such as segment vectors, squared lengths and
+  tangents offline or during a bounded initialisation callback;
+- retain each entity's last segment, cell, or region and search a small bounded
+  neighbourhood before using a rare full-search fallback;
+- compare squared distances inside searches and calculate square roots only
+  for the selected result;
+- calculate repeated trigonometric values once per entity per tick;
+- use fixed-size/reused tables in hot loops instead of constructing temporary
+  tables, closures, or sorted copies;
+- document the maximum entities, segments and collision pairs so the
+  worst-case work is visibly bounded.
+
+Profile on the actual ESP32 with the maximum player count and most expensive
+track/state. `clock.tick()` can measure a callback section, but logging itself
+adds work, so accumulate a maximum and emit it only occasionally:
+
+```lua
+local started = clock.tick()
+simulate_one_tick(context, delta_ms)
+local elapsed = clock.tick() - started
+context.maxTickMs = math.max(context.maxTickMs or 0, elapsed)
+context.profileTicks = (context.profileTicks or 0) + 1
+if context.profileTicks >= 100 then
+    log.info("max tick ms: " .. context.maxTickMs)
+    context.profileTicks = 0
+    context.maxTickMs = 0
+end
+```
+
+Remove or disable profiling logs for release builds and keep measured
+worst-case time well below both the suggested target and the hard limit.
+
+`transport.broadcast_snapshot()` caches and sends a full snapshot to all match
+members. `transport.send_snapshot()` sends a profile-specific snapshot to all
+of that member's connected tabs. `transport.broadcast_event()` sends a named
+event to all members; event names use the same 32-byte limit as actions.
+
+In tick mode, mutate authoritative state in `on_tick` and return the current
+full state from `on_snapshot`. Firmware invokes `on_snapshot` at the separately
+capped snapshot cadence. Do not call `broadcast_snapshot()` on every tick;
+reserve an explicit broadcast for exceptional ordering needs such as the final
+visual state immediately before `match.finish()`. Explicit tick-mode
+broadcasts are also rate-capped; if a final broadcast falls inside that window,
+firmware flushes its cached state ahead of the validated result.
+
+`clock.tick()` returns monotonic system uptime in milliseconds. It is not wall
+clock time. `random.next()` returns a non-negative platform random integer.
+
+`log.info()` accepts at most 160 bytes and writes a line tagged with the
+application ID. Do not log secrets or unbounded user content.
+
+### Finishing a match and recording wins
+
+Only Lua may request an authoritative finish. The browser cannot submit a
+result or update a profile.
+
+Resolve current seat numbers with `match.players()` and submit every occupied
+player exactly once:
+
+```lua
+match.finish({
+    draw = false,
+    placements = {
+        {seat = 2, place = 1},
+        {seat = 1, place = 2}
+    }
+})
+```
+
+Firmware validates all of the following:
+
+- the match has not already finished or recorded a result;
+- `placements` has exactly one entry for every occupied player seat;
+- every seat is occupied, in range, and appears only once;
+- every place is an integer from 1 through the number of players;
+- at least one placement is first;
+- when `draw` is `true`, every player has place 1;
+- the compact result request fits the snapshot-output limit.
+
+`draw` defaults to `false` when omitted. A non-draw may contain tied first
+places; every first-place profile receives one aggregate win. Draws do not
+increment wins.
+
+Firmware resolves seats back to authenticated profiles, generates one
+idempotent result ID, records and asynchronously persists aggregate wins,
+marks the match finished once, and broadcasts a validated result:
 
 ```json
 {
-  "v": 1,
-  "type": "game.snapshot",
-  "id": 902,
+  "appId": "example-game",
+  "matchId": "m_1234abcd",
+  "revision": 12,
+  "serverTick": 527109,
   "payload": {
-    "appId": "four-karts",
-    "matchId": "m_a19f",
-    "revision": 340,
-    "serverTimeMs": 912340,
-    "ackInputSeq": 118,
-    "state": {}
+    "resultId": "r_1234abcd",
+    "draw": false,
+    "placements": [
+      {
+        "seat": 2,
+        "place": 1,
+        "profileId": "p_...",
+        "nickname": "Alex",
+        "wins": 4
+      },
+      {
+        "seat": 1,
+        "place": 2,
+        "profileId": "p_...",
+        "nickname": "Sam",
+        "wins": 1
+      }
+    ]
   }
 }
 ```
 
-Lifecycle and errors:
+The callback registered with `arcade.game.onResult` receives that envelope, so
+the validated result is `result.payload`. Use each placement's validated
+`wins` value for an immediate result screen; the accompanying public-profile
+update also refreshes the winner's aggregate score in the lobby.
+
+`match.finish()` closes and unloads the runtime after the current callback
+returns. No automatic post-command snapshot is generated once the match is
+finished. Broadcast the final visual state before finishing:
+
+```lua
+context.status = "won"
+context.winner = winner
+
+transport.broadcast_snapshot(snapshot(context))
+match.finish({
+    draw = false,
+    placements = placements
+})
+```
+
+Do not implement a post-finish `"reset"` command. The completed match is
+closed, and a later `arcade.game.join("example-game")` creates a fresh match
+and fresh runtime. Detailed per-game played/win/loss/draw statistics are not
+yet stored; those remain Phase 4 work.
+
+### Namespaced storage
+
+With `storage.app-data`, a game can read and write JSON-compatible records:
+
+```lua
+local settings = storage.read("settings")
+if not settings then
+    settings = {sound = true}
+end
+
+storage.write("settings", settings)
+```
+
+Keys are 1–48 bytes and may contain letters, digits, `-`, `_`, and `.`.
+Firmware maps the example to:
 
 ```text
-game.match
-game.snapshot
-game.event
-game.result
-game.error
+/data/apps/example-game/settings.json
 ```
 
-The dispatcher derives the sender from the authenticated socket. It must
-ignore any client-supplied nickname, role, wins, or claimed identity. Messages
-must be routed only to members/spectators of the matching game instance, not
-broadcast to every authenticated browser.
+`storage.read()` returns `nil` when a record does not exist. Reads are
+synchronous on the game worker. Writes are size-checked, queued through the
+storage worker, and replace the destination atomically. A record is at most
+4096 bytes with the default configuration.
 
-### 7.4 Independently deployable authoritative logic
+Never use storage as per-frame or per-command state. `storage.write()` is
+explicitly rejected from `on_tick`. SD removal stops active runtimes and
+prevents further writes. Total per-application quotas and versioned migrations
+are Phase 4 features.
 
-A true SD-only multiplayer game needs a server runtime. Three implementation
-tiers are useful:
+### Sandbox and failure behaviour
 
-1. **Declarative engine:** manifests and data describe turns, decks, boards,
-   timers, and scoring. Safest and smallest, but unsuitable for arbitrary
-   games.
-2. **Sandboxed script engine:** a compact runtime such as Lua executes
-   `/apps/<id>/server/...` with instruction, memory, tick-time, state-size, and
-   storage quotas. It receives only platform capabilities and has no raw
-   filesystem, socket, NVS, GPIO, or administrative access.
-3. **Native firmware adapter:** C/C++ component for performance-critical games.
-   It follows the same match/result interfaces but requires a firmware build.
+Available standard libraries are base, coroutine, table, string, math, and
+UTF-8. Dynamic loading and `dofile`, `load`, `loadfile`, `require`,
+`collectgarbage`, `print`, `getmetatable`, and `setmetatable` are removed. The
+filesystem, package loader, operating-system, debug, network, WebSocket, GPIO,
+NVS, credential, device-identity, and administrative APIs are not exposed.
 
-The recommended platform supports declarative and sandboxed games for
-independent deployment, while retaining native adapters for simulations which
-cannot meet script budgets. Loading native binaries from SD is not recommended
-on ESP32; it greatly expands the security, ABI, crash-isolation, and recovery
-surface.
+Each callback is a protected call with memory, instruction, execution-time,
+recursion, JSON-depth, and output-size limits. Loading and every callback run
+on the dedicated bounded game worker, never in a WebSocket callback. A Lua
+error or limit violation closes that runtime, marks its match `finished`, and
+sends `game.error` with code `runtime_failed`. Wi-Fi, profiles, chat, storage,
+and the lobby continue running.
 
-The runtime must:
+Treat platform API errors as fatal to the current callback: the C binding
+raises a Lua error when a capability is denied, a payload is invalid, an
+output is too large, or a queued operation cannot be accepted.
 
-- bound allocations and execution time per command/tick;
-- stop only the faulty game, never reboot the portal;
-- expose deterministic/random APIs explicitly;
-- namespace data below `/data/apps/<id>/`;
-- queue atomic writes through the storage worker;
-- prevent writes during safe eject;
-- validate every script-produced message and result;
-- provide structured errors and bounded logs;
-- unload or restart cleanly after a package update.
+### Diagnosing runtime stops
 
-## 8. One-to-four-player match pattern
-
-A generic match service should own this lifecycle:
+The serial log distinguishes a contained game failure from a firmware crash:
 
 ```text
-closed → waiting → countdown → playing → finished → waiting/closed
+LUA_RUNTIME: example-game stopped: on_tick: ... execution-time limit exceeded
+GAME_PLATFORM: Match m_... stopped after tick fault
+LUA_RUNTIME: Unloaded example-game (...)
 ```
 
-Required rules:
+This sequence means fault containment worked; it is not an ESP32 crash. An
+actual firmware reset instead produces a reset reason or boot banner and may
+include a panic/backtrace.
 
-- `maxPlayers` is validated from 1 to 4.
-- Seats are keyed by profile ID, never IP, MAC, token, tab, or socket.
-- Join is idempotent: another tab for the same profile observes the same seat.
-- A player has at most one seat in a match.
-- Spectators are explicit and bounded separately.
-- The server chooses or validates seat/team assignment.
-- Disconnect starts a game-specific reservation grace period.
-- Reconnection with the same profile resumes the seat and receives a snapshot.
-- Explicit Leave releases the seat immediately.
-- Late join follows the manifest policy: player, spectator, next round, or
-  reject.
-- The administrator role has no automatic gameplay advantage.
-- A profile deletion removes its seat safely.
-- Every state carries a monotonic revision so stale events are ignored.
-- Private state, such as a hand of cards, uses targeted per-profile messages.
+For execution-time and instruction-limit errors, the reported Lua line is
+where the periodic hook noticed the exceeded limit. It is not necessarily the
+single expensive statement. Inspect the entire callback path, including loops
+and helper calls executed before that line. A `tick overrun: 51 ms budget
+50 ms` warning means the callback completed but already missed its simulation
+interval; treat even one repeatable overrun as a release blocker.
 
-Four-player acceptance must cover:
+Common interpretations are:
 
-1. Four different phones join one match.
-2. A fifth phone spectates or receives a bounded full response.
-3. A second tab for one profile does not consume another seat.
-4. One phone disconnects and rejoins inside the grace period.
-5. One phone returns after grace expiry.
-6. The admin ejects the SD card before, during, and after a match.
-7. A player switches or deletes its profile mid-match.
-8. All four phones receive the same final revision and result.
+| Serial message | Likely game issue |
+|---|---|
+| `on_tick ... execution-time limit exceeded` | Simulation, spatial search, ranking, or snapshot work is too expensive |
+| `on_snapshot ... execution-time limit exceeded` | Reconciliation, sorting, allocation, or payload construction is too expensive |
+| `instruction limit exceeded` | Excessive/infinite Lua loop or recursion |
+| `not enough memory` or memory-quota failure | Retained or temporary Lua state is too large |
+| `runtime_failed` in the browser | The platform contained one of the server-runtime failures above |
 
-## 9. Full-page game views
+The browser should show `runtime_failed` as a game-runtime error, disable input,
+and offer a fresh join. Do not silently label it a Wi-Fi failure or continue
+sending commands with the failed match ID.
 
-“Full page” should be a system-shell display mode, not a direct navigation to
-an SD HTML file. Direct navigation would lose the established client,
-authentication, reconnect logic, and safe exit path.
+## Current limits and phase status
 
-The target shell should support:
+These are the default firmware 0.3.0 build limits. Some effective values are
+also reported by `/api/v1/apps`; package authors must not assume a custom build
+uses larger values.
 
-```text
-embedded   game card remains inside the lobby
-full-page  game stage occupies the viewport; a system overlay remains
+| Resource | Default |
+|---|---:|
+| Active matches | 1 |
+| Player seats per match | 1–4 |
+| Spectators per match | 4 |
+| Critical outbound messages per connection | 4 |
+| Queue-pressure strikes before slow-client close | 24 |
+| Command rate per profile | 20/second |
+| Game-defined command data | 1024 bytes |
+| Game-defined snapshot, event, or result data | 4096 bytes |
+| Runtime work queue | 12 entries |
+| Lua source | 65,536 bytes |
+| Lua memory per match | 131,072 bytes |
+| Lua instructions per callback | 100,000 |
+| Lua callback time | 50 ms |
+| Lua/C and string-pattern recursion | 64 nested calls |
+| JSON conversion depth | 16 |
+| Storage key | 48 bytes |
+| Storage record | 4096 bytes |
+| Requested tick rate | Clamped to 30 Hz |
+| Snapshot rate | Capped at 10 Hz |
+| Requested reconnect grace | Clamped to 60 seconds |
+
+Implemented in the current Phase 3 firmware:
+
+- generic matches, one-to-four profile seats, and bounded spectators;
+- controller leases, reconnect grace, sequence checks, and command limits;
+- scoped browser SDK and match/targeted JSON transport;
+- SD-hosted Lua loading, capability APIs, quotas, and fault containment;
+- automatic and requested full snapshots;
+- monotonic fixed-rate ticks, overrun detection, and accumulated-tick dropping;
+- separately capped snapshot cadence and compact binary tick snapshots;
+- latest-snapshot coalescing, bounded critical output, and slow-client closure;
+- validated, idempotent results with aggregate win persistence;
+- namespaced asynchronous record writes;
+- Tic-Tac-Toe and PocketBlocks with no game-specific firmware rules.
+
+Not implemented yet:
+
+- detailed per-game statistics, storage quotas, and migrations;
+- sandboxed browser frames, package validator, mock runtime, and resource
+  telemetry.
+
+Use `"mode": "event"` when a game needs no idle work. For `"mode": "tick"`,
+firmware calls `on_tick` only while the platform match is `playing`, at the
+manifest rate clamped to 30 Hz. The scheduler executes at most one due tick per
+pass and drops excess accumulated ticks. Automatic snapshots run independently
+at no more than 10 Hz; clients may render more frequently by interpolating
+between authoritative snapshots.
+
+## Test and deploy
+
+Before copying a package, check:
+
+- directory and manifest IDs are identical lowercase names;
+- manifest JSON is under 4096 bytes and all referenced files exist;
+- the Lua file is source text and under the advertised script limit;
+- capabilities cover every gated API the script calls;
+- command, snapshot, event, result, and storage values are JSON-compatible;
+- every CSS selector is scoped below the game's root;
+- the client uses the supplied facade and does not create another WebSocket;
+- every listener, timer, animation frame, and resource is released on cleanup;
+- every callback rejects envelopes for a different active `matchId`;
+- `you.role == "none"` clears the local match, snapshot, result, input, timer,
+  and revision state;
+- the client-only `closed` update and connection loss clear every cached match
+  ID and prevent commands until authoritative membership returns;
+- changing `matchId` resets all per-match state before accepting new snapshots;
+- controls use authoritative match/snapshot state and show `game.error`;
+- simultaneous held controls stay below the aggregate command-rate limit;
+- reconnect and controller claim recover through a full snapshot;
+- a second tab does not create another player seat;
+- spectators cannot send commands;
+- player callbacks reconcile membership immediately without depending on a
+  future tick;
+- leaving during waiting, countdown, and playing follows an explicit game rule;
+- every retained Lua history, queue, cache, and per-player table is bounded;
+- worst-case callbacks stay below both the callback deadline and tick interval;
+- simulation, membership, ranking, and snapshot construction do not perform
+  repeated full scans or sorts in the same hot callback;
+- static geometry is precomputed and spatial searches have a documented bound;
+- serial high-water and tick-overrun logs retain safe headroom during long play;
+- final state is broadcast before `match.finish`;
+- results include every occupied seat exactly once;
+- storage and runtime failures affect only the game.
+
+Exercise the lifecycle rather than testing only the happy path:
+
+1. Join, explicitly leave, and join again without reloading the browser.
+2. Replace a player during waiting and during any game-specific countdown.
+3. Leave during active play with both the minimum and more than the minimum
+   player count present.
+4. Finish a match, start another, and inject or delay an old snapshot/event in
+   the browser harness; it must not alter the new match.
+5. Hold every valid multitouch/control combination for several rate windows
+   and confirm it neither floods `game.error` nor fills the runtime queue.
+6. Run repeated join/leave cycles and a long simulated match while observing
+   that Lua memory and retained table sizes remain bounded.
+7. Disconnect and reconnect inside and outside the grace period, including a
+   controller transfer between two tabs of the same profile. Force a WebSocket
+   drop during active play and verify that the SDK emits `closed`, clears
+   `currentMatch()` and input sequencing, sends no request with the stale match
+   ID, then accepts a full authoritative snapshot after reconnect.
+8. Load all client assets before a realtime match, then play through a weak or
+   deliberately slow connection and confirm that asset traffic or a coalesced
+   snapshot cannot create an unbounded browser or firmware queue.
+9. Profile the maximum player/entity count on the largest or most complex
+   track/state. Exercise collision pile-ups, the transition from countdown to
+   active simulation, and ticks on which a snapshot becomes due. Confirm that
+   neither an individual phase nor their combination approaches the callback
+   deadline, and treat any repeatable tick-overrun warning as a failed test.
+
+To install or update:
+
+1. Use the PocketArcade storage control to eject the SD card safely.
+2. Copy the complete package to `/apps/<application-id>/`.
+3. Reinsert and mount the card, or restart PocketArcade so the catalogue
+   rescans it.
+4. Hard-reload each phone's browser before testing an updated client script.
+5. Test with separate profiles, then repeat with two tabs using one profile.
+
+Application assets use a short browser revalidation cache, and the lobby keeps
+an already loaded script URL for the current page. Changing the manifest
+version alone does not unload old JavaScript, which is why a browser reload is
+required during package development.
+
+For an in-repository game, run the host checks from the firmware repository:
+
+```bash
+python3 -m unittest tests.host.test_repository -v
+node --check sdcard-example/apps/tic-tac-toe/client/app.js
+node --check sdcard-example/apps/pocketblocks/client/app.js
 ```
 
-A full-page stage needs:
-
-- `100dvh` sizing plus safe-area insets;
-- a persistent Exit/Back control owned by the flash-hosted shell;
-- connection/reconnecting indication;
-- controlled portrait/landscape preference with a usable fallback;
-- no body scrolling or browser zoom traps;
-- explicit keyboard, pointer, touch, and gamepad lifecycle;
-- cleanup on Exit, profile switch, storage loss, and authentication failure;
-- optional use of the browser Fullscreen API only after a user gesture;
-- restoration of lobby scroll/focus when closed;
-- `visibilitychange` handling so hidden clients stop rendering/sending input.
-
-For CSS isolation, Shadow DOM is useful but does not protect tokens or system
-APIs. The stronger target is a sandboxed iframe with a narrow `postMessage`
-bridge. The frame should never receive the session token and should not be
-able to navigate or modify the parent shell. This also prevents one game's CSS
-and globals from corrupting another game or the account UI.
-
-## 10. Realtime top-down racing pattern
-
-A racing game is feasible only if the ESP32 owns a compact simulation and
-clients render smoothly between lower-rate network updates.
-
-Recommended flow:
-
-```text
-phone input samples
-      ↓
-shared WebSocket: latest input + sequence
-      ↓
-authoritative ESP32 simulation tick
-      ↓
-bounded state snapshots/deltas
-      ↓
-client interpolation/prediction at display refresh rate
-```
-
-Do not send a player's claimed position, lap win, or collision outcome as
-truth. Send controls such as steer, throttle, brake, and an input sequence.
-The server applies physics, checkpoints, laps, collisions, and finish order.
-
-Initial practical budgets for four players should be measured rather than
-treated as guarantees:
-
-- 20–30 Hz authoritative simulation tick;
-- 10–15 Hz snapshots to each client;
-- at most 20 input messages per second from each client;
-- compact integer/fixed-point state where practical;
-- client rendering at 60 Hz using interpolation;
-- a full snapshot on join/reconnect and bounded deltas thereafter;
-- no SD writes during a race; queue only the validated final result.
-
-Each snapshot needs:
-
-- match and revision IDs;
-- monotonic server time or tick;
-- the recipient's last acknowledged input sequence;
-- position, heading, velocity, race progress, and status for each entity;
-- a way to detect a missing delta and request a full snapshot.
-
-The client should:
-
-- keep two or more snapshots for interpolation;
-- predict only its own vehicle;
-- reconcile gradually unless error is unsafe;
-- discard snapshots older than its rendered revision;
-- replace stale unsent inputs instead of building an unbounded queue;
-- pause input/render work while hidden;
-- preload track-critical assets before signalling Ready.
-
-Firmware 0.1 is not ready for this load. Its JSON WebSocket frames are limited
-to 2048 bytes by default, input is limited to 20 messages/second per
-connection, every game update is globally broadcast, and there is no
-backpressure, targeted delivery, tick scheduler, clock synchronisation,
-delta protocol, or binary frame support. JSON can remain the control protocol;
-compact binary snapshots may be added later without creating a second
-WebSocket.
-
-Do not assume PSRAM exists or is enabled merely because some ESP32-CAM modules
-include it. The simulation and minimum client service must have explicit
-internal-RAM budgets and degrade safely when optional PSRAM is unavailable.
-
-## 11. Results and profile statistics
-
-Only authoritative server/runtime code may submit a result. The browser may
-display a finish animation but cannot increment wins.
-
-The target result record should distinguish game-specific statistics from the
-public aggregate:
-
-```json
-{
-  "resultId": "r_f30a",
-  "appId": "four-karts",
-  "appVersion": "1.2.0",
-  "matchId": "m_a19f",
-  "finishedAt": 912340,
-  "participants": [
-    {"profileId": "p_...", "place": 1, "outcome": "win"},
-    {"profileId": "p_...", "place": 2, "outcome": "loss"}
-  ]
-}
-```
-
-The server must make `resultId` idempotent, validate participants against the
-finished match, update every affected cached profile, broadcast public changes,
-and queue one atomic persistence operation. Recommended stored counters are:
-
-```text
-aggregate: wins
-per game: played, wins, losses, draws, best result, last played
-```
-
-Detailed history belongs below `/data/apps/<id>/` and should have retention and
-size limits. Public lobby profiles should stay small. A game must not receive
-another profile's private history unless that data is deliberately public.
-
-## 12. Security and robustness rules
-
-Current SD JavaScript executes in the same origin and document as the system
-shell. Therefore any installed 0.1 package is fully trusted code and can reach
-browser internals which were not intended as a public SDK. Install only code
-you control until sandboxing is implemented.
-
-Every future game boundary must enforce:
-
-- bounded manifest, message, state, asset, memory, timer, and storage sizes;
-- no client-supplied identity or results;
-- server validation of state transitions and numeric ranges;
-- capability-scoped APIs;
-- per-game and per-connection rate limits;
-- targeted messages for secrets;
-- no raw token, MAC, fingerprint, IP, filesystem, or NVS access;
-- path validation and application data isolation;
-- safe text rendering and a restrictive content policy;
-- clean cancellation when storage unmounts;
-- fault containment so one game cannot stop Wi-Fi, lobby, chat, or profiles.
-
-## 13. Required platform backlog
-
-### P0 — required for independently deployed multiplayer games
-
-1. Introduce a versioned Game SDK facade and generic `game.*` dispatcher.
-2. Add a bounded match/session service with 1–4 seats, spectators, explicit
-   lifecycle, reconnection reservations, and profile-based membership.
-3. Choose and implement the independent authoritative runtime:
-   declarative engine, sandboxed Lua, or both.
-4. Add broadcast-to-match, targeted-to-profile, and reply-to-connection sends
-   with bounded queues and slow-client handling.
-5. Add server-authoritative generic results and per-game statistics.
-6. Add shell-managed embedded/full-page display modes and reliable cleanup.
-7. Isolate game code from the system token and DOM, preferably with a
-   sandboxed frame and message bridge.
-
-### P1 — required for a supportable third-party SDK
-
-1. Manifest v2 with game version, platform compatibility, display,
-   multiplayer, runtime, protocol, and capability declarations.
-2. Package validation which reports precise errors in the admin UI.
-3. Cache/version invalidation and an explicit update/uninstall lifecycle.
-4. Asset preloading/progress APIs and package size guidance.
-5. Per-app storage quotas and atomic game-data APIs.
-6. A desktop package validator, mock PocketArcade client, browser preview
-   harness, schema files, and example tests.
-7. Defined compatibility/deprecation policy for manifests, client APIs,
-   messages, and stored data migrations.
-
-### P2 — required before claiming realtime racing support
-
-1. Fixed-rate simulation scheduler with execution budgets.
-2. Server tick/time synchronisation, input sequences, acknowledgements, full
-   snapshots, and deltas.
-3. Per-client output queues, coalescing, backpressure, and slow-client
-   disconnection.
-4. Compact/binary snapshot support on the existing WebSocket where JSON cannot
-   meet measured budgets.
-5. Load tests for four players plus spectators, reconnect storms, SD activity,
-   and weak phones.
-6. CPU, heap, internal RAM, optional PSRAM, Wi-Fi airtime, frame-size, and
-   latency telemetry.
-
-## 14. Definition of done for the Game SDK
-
-PocketArcade can claim independently developed games when a developer can:
-
-1. create a package using only published schemas and SDK files;
-2. validate and preview it without the ESP-IDF repository;
-3. copy it to a card and mount it without reflashing firmware;
-4. run its authoritative rules without access to system secrets;
-5. admit one to four profiles plus bounded spectators;
-6. survive duplicate tabs, reconnects, profile changes, and storage loss;
-7. use embedded or full-page presentation through the same system client;
-8. record an idempotent authoritative result and persistent per-game stats;
-9. fail or exceed a resource limit without crashing the PocketArcade shell;
-10. pass the published multi-device and realtime acceptance suites.
-
-Until those conditions are met, describe SD packages as independently
-deployable **browser presentations**, with their multiplayer server logic
-provided by the matching firmware.
+Then test on the ESP32 with serial logging attached. The authoritative platform
+roadmap and final acceptance criteria are in the
+[firmware development brief](V2dev.md).

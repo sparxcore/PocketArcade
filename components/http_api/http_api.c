@@ -35,6 +35,7 @@ static esp_err_t send_json(httpd_req_t *request, const char *status,
     httpd_resp_set_type(request, "application/json; charset=utf-8");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
     httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
+    httpd_resp_set_hdr(request, "Connection", "close");
     esp_err_t err = httpd_resp_send(request, text, HTTPD_RESP_USE_STRLEN);
     cJSON_free(text);
     return err;
@@ -482,6 +483,7 @@ static esp_err_t avatar_get_handler(httpd_req_t *request)
     httpd_resp_set_type(request, "image/jpeg");
     httpd_resp_set_hdr(request, "Cache-Control", "no-store");
     httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
+    httpd_resp_set_hdr(request, "Connection", "close");
     esp_err_t result =
         httpd_resp_send(request, (const char *)data, file_size);
     free(data);
@@ -551,6 +553,12 @@ esp_err_t http_api_start(httpd_handle_t *server)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_open_sockets = CONFIG_PA_HTTP_MAX_OPEN_SOCKETS;
     config.max_uri_handlers = CONFIG_PA_HTTP_MAX_URI_HANDLERS;
+    /*
+     * Captive-portal probes are frequently abandoned without reading their
+     * response. Do not let one such socket monopolise the single HTTP server
+     * task for the ESP-IDF five-second default while game clients are active.
+     */
+    config.send_wait_timeout = 1;
     config.lru_purge_enable = true;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.close_fn = close_socket;

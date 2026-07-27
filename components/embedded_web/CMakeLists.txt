@@ -3,10 +3,14 @@ file(MAKE_DIRECTORY "${WEB_GENERATED_DIR}")
 
 set(WEB_ASSET_SOURCES
     "${PROJECT_DIR}/web/index.html"
+    "${PROJECT_DIR}/web/portal.html"
     "${PROJECT_DIR}/web/css/app.css"
+    "${PROJECT_DIR}/web/css/portal.css"
     "${PROJECT_DIR}/web/js/pocket-arcade.js"
     "${PROJECT_DIR}/web/js/app.js"
     "${PROJECT_DIR}/web/assets/icon.svg"
+    "${PROJECT_DIR}/web/assets/portal-horizontal.jpg"
+    "${PROJECT_DIR}/web/assets/portal-vertical.jpg"
 )
 
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)

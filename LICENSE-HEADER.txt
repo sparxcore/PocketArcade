@@ -1,0 +1,5 @@
+Copyright © 2026 AIGENUITY LTD
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
+Commercial licensing: aigenuityltduk@gmail.com
+See the repository LICENSE and NOTICE files for complete terms.

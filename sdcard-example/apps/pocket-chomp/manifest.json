@@ -1,0 +1,33 @@
+{
+  "manifestVersion": 2,
+  "id": "pocket-chomp",
+  "name": "Pocket Chomp",
+  "description": "A fast multiplayer maze chase with human Chompers and Ghosts.",
+  "version": "1.0.1",
+  "minPlatformVersion": "0.3.0",
+  "kind": "game",
+  "client": {
+    "entrypoint": "client/app.js",
+    "stylesheet": "client/app.css"
+  },
+  "runtime": {
+    "type": "lua",
+    "entrypoint": "server/main.lua",
+    "mode": "tick",
+    "tickRateHz": 20
+  },
+  "multiplayer": {
+    "minPlayers": 2,
+    "maxPlayers": 4,
+    "spectators": true,
+    "lateJoin": "spectator",
+    "reconnectGraceMs": 30000
+  },
+  "protocol": {
+    "version": 1
+  },
+  "capabilities": [
+    "match.seats",
+    "match.results"
+  ]
+}

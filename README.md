@@ -1,14 +1,28 @@
-# PocketArcade 0.1
+Copyright © 2026 AIGENUITY LTD
+
+PocketArcade is available under the PolyForm Noncommercial License 1.0.0 for personal, educational, hobbyist and other non-commercial purposes.
+
+Any commercial use, commercial distribution, incorporation into a commercial product or service, or use intended for commercial advantage requires a separate commercial licence from AIGENUITY LTD.
+
+See the LICENSE file for the full public licence terms.
+
+Commercial licensing enquiries: aigenuityltduk@gmail.com
+
+PocketArcade names, logos and branding are not licensed for reuse.
+
+# PocketArcade 1.0 (realtime multiplayer platform Phase 3)
 
 PocketArcade turns an ESP32-family board into a self-contained local multiplayer
 browser platform. It creates a Wi-Fi access point, serves a captive-portal-style
 mobile interface from internal flash, remembers local players, displays live
 presence, and continues in RAM-only mode when its SD card is unavailable.
 
-Version 0.1 includes the platform foundation, compact SD-backed profile photos,
-a 50-message shared lobby chat, and an SD-hosted Tic-Tac-Toe browser
-application. Tic-Tac-Toe's authoritative rules are compiled into firmware;
-version 0.1 does not execute server scripts from removable media.
+Version 0.3 adds bounded realtime execution to the generic multiplayer
+foundation: monotonic fixed-rate Lua ticks, a separately capped snapshot
+cadence, compact binary snapshot envelopes, latest-snapshot coalescing,
+per-connection critical output rings, and consistent slow-client closure.
+Tic-Tac-Toe and PocketBlocks are authoritative entirely from their SD
+packages; firmware contains no rules for either game.
 
 ## What is implemented
 
@@ -16,6 +30,8 @@ version 0.1 does not execute server scripts from removable media.
   security mode, and a bounded station MAC-to-IP table.
 - DHCP captive-portal API advertisement, wildcard DNS, and common Android,
   Apple, and Windows captive-check routes.
+- A responsive flash-hosted welcome screen with compressed portrait/landscape
+  artwork and an explicit handoff to the full browser UI.
 - Dependency-free, deterministic gzip preparation and flash embedding of the
   complete system UI.
 - NVS-generated 256-bit device secret and HMAC-SHA256 station fingerprints.
@@ -34,8 +50,25 @@ version 0.1 does not execute server scripts from removable media.
   persisted to `/data/chat/recent.json`.
 - A validated cached SD application catalogue, protected `/apps/<id>/*`
   serving, and copy-ready Tic-Tac-Toe for two players plus spectators.
-- Persistent profile win counts, updated by authoritative game results and
-  represented by evolving colour/shape roundels in the lobby.
+- Manifest-v2 runtime/multiplayer validation with firmware-clamped player,
+  reconnect, tick, script, command, snapshot, and memory policies.
+- Generic match membership keyed by profile, one controller lease per seat,
+  input sequencing, reconnection snapshots, and a bounded runtime queue.
+- Sandboxed Lua server scripts loaded from SD on the dedicated game worker,
+  with restricted libraries, capability-gated host APIs, per-instance memory
+  accounting, callback instruction/time/recursion limits, bounded JSON output,
+  protected calls, and match-local fault termination.
+- Fixed-tick Lua matches scheduled from monotonic time on that worker, with
+  overrun detection, accumulated-tick dropping, and simulation rates clamped
+  to 30 Hz independently from a maximum 15 Hz snapshot cadence.
+- Compact binary realtime snapshots carry stable application/match handles,
+  revision, server time, input acknowledgement, and a bounded opaque payload.
+  Each connection retains only its newest unsent snapshot while critical
+  lifecycle/error/result traffic uses a fixed ring; consistently slow clients
+  are closed before they can grow memory without bound.
+- Firmware-validated match results update persistent aggregate profile wins and
+  the lobby's evolving colour/shape roundels. Detailed per-game statistics are
+  reserved for Phase 4.
 - Safe queued SD eject/mount controls, accessibility, exponential browser
   reconnection, and strict public/internal profile separation.
 
@@ -53,6 +86,11 @@ cJSON v1.7.19 is vendored under `components/json` with its MIT license because
 ESP-IDF 6 no longer bundles the former `json` component. This preserves offline
 builds. IDF 6's supported PSA Crypto API is used for HMAC-SHA256 fingerprints
 and SHA-256 session-token hashes.
+
+Lua 5.4.8 is vendored under `components/lua` from the official Lua source
+release. Only the base, coroutine, table, string, math, and UTF-8 libraries are
+compiled; filesystem, operating-system, package-loader, and debug libraries
+are excluded.
 
 ESP-IDF 6 dispatches a WebSocket URI handler only after the HTTP upgrade while
 the request method remains `HTTP_GET`. PocketArcade reserves its bounded
@@ -76,7 +114,7 @@ slot under the single PocketArcade menu; pin numbers are not duplicated in
 source.
 
 The checked-in partition table supports 4 MB flash and gives the factory app
-almost 4 MB. OTA is deliberately outside the v0.1 scope.
+almost 4 MB. OTA is deliberately outside the current scope.
 
 ## Flash and monitor
 
@@ -91,13 +129,17 @@ Then:
 
 1. Join Wi-Fi `PocketArcade`.
 2. Use Android's **Sign in to network** notification (or the equivalent
-   portal prompt), or open `http://192.168.4.1/`.
-3. Choose a nickname.
+   portal prompt). The flash-hosted welcome screen opens first.
+3. Choose **Start** to request the full PocketArcade UI in the device browser.
+4. Choose a nickname.
 
 PocketArcade advertises the standard captive-portal API and answers legacy
 connectivity checks, but Android/iOS decide whether to open their portal window
 automatically. Firmware cannot force an OS browser launch when the device has
 disabled captive-portal notifications or remembered a previous choice.
+Captive browsers also decide whether a new HTTP browsing context can leave
+their sign-in window; the welcome screen includes an **Open in browser**
+fallback instruction. `http://192.168.4.1/` always opens the full UI directly.
 
 The default network is open so nearby players can join quickly. Set an
 8–63-byte password under **PocketArcade → Access-point password** when network
@@ -179,30 +221,33 @@ device binding or deletes the profile, the next profile to authenticate becomes
 administrator. This is local operational convenience, not strong security on
 an open Wi-Fi network.
 
-Authoritative game results increment the winner's persisted `wins` value.
 Roundels start as a neutral circle, change colour through early wins, then
-change shape as totals rise.
+change shape as totals rise. Validated first-place results update the aggregate
+score immediately; Phase 4 adds played/loss/draw and other per-game statistics.
 
 The flash-hosted `/`, `/system/*`, `/assets/system/*`, `/api/v1/*`, and `/ws`
 namespaces can never be shadowed by the SD card.
 
-## Install the Tic-Tac-Toe test application
+## Install the SD game packages
 
-The game's browser package can be prepared and copied independently. Its
-matching authoritative game component is included in this firmware. Choose
+The complete browser and authoritative server package can be copied
+independently. Choose
 **Profile → Admin → Eject SD card** and wait for **Safe to remove SD card**.
 Put the card in this computer and copy:
 
 ```text
-sdcard-example/apps/tic-tac-toe
-        → <SD card>/apps/tic-tac-toe
+sdcard-example/apps/tic-tac-toe → <SD card>/apps/tic-tac-toe
+sdcard-example/apps/pocketblocks → <SD card>/apps/pocketblocks
 ```
 
-Preserve `manifest.json`, `app.js`, and `app.css`. Eject the card from the
-computer, reinsert it in the ESP32-CAM, and choose **Profile → Admin → Mount
-SD card**. The launcher rescans once per mount. The game browser package is served from
-`/apps/tic-tac-toe/*`, reuses the system page's shared WebSocket, and is not
-compiled into the immutable system web interface.
+Preserve `manifest.json` and the complete `client/` and `server/` directories.
+Eject the card from the computer, reinsert it in the ESP32-CAM, and choose
+**Profile → Admin → Mount SD card**. The launcher rescans once per mount. The
+Each client is served from its own `/apps/<id>/*` namespace and uses the scoped
+shared-socket facade. Its `server/main.lua` rules execute through the same
+generic sandbox and match protocol. PocketBlocks is the Phase 3 fixed-tick,
+binary-snapshot validation game; it does not add falling-block rules to the
+firmware.
 
 ## Tests
 

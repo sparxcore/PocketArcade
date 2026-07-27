@@ -10,7 +10,22 @@ class PocketArcadeClient {
     this.apps = [];
     this.players = new Map();
     this.chatMessages = [];
-    this.game = null;
+    this.gameMatches = new Map();
+    this.gameSnapshots = new Map();
+    this.gameInputSequences = new Map();
+    this.game = Object.freeze({
+      join: (appId) => this.joinGame(appId),
+      leave: (matchId) => this.leaveGame(matchId),
+      ready: (matchId) => this.readyGame(matchId),
+      send: (matchId, action, data) => this.sendGameCommand(matchId, action, data),
+      claimControl: (matchId) => this.claimGameControl(matchId),
+      requestSnapshot: (matchId) => this.requestGameSnapshot(matchId),
+      onMatch: (callback) => this.on("game.match", callback),
+      onSnapshot: (callback) => this.on("game.snapshot", callback),
+      onEvent: (callback) => this.on("game.event", callback),
+      onResult: (callback) => this.on("game.result", callback),
+      onError: (callback) => this.on("game.error", callback),
+    });
     this.socket = null;
     this.sequence = 0;
     this.listeners = new Map();
@@ -35,6 +50,24 @@ class PocketArcadeClient {
   setConnection(status) {
     this.connectionStatus = status;
     this.emit("connection.changed", status);
+  }
+
+  clearGameConnectionState() {
+    const previousMatches = [...this.gameMatches.values()];
+    this.gameMatches.clear();
+    this.gameSnapshots.clear();
+    this.gameInputSequences.clear();
+    for (const match of previousMatches) {
+      this.emit("game.match", {
+        ...match,
+        state: "closed",
+        you: {
+          ...(match.you || {}),
+          role: "none",
+          controller: false,
+        },
+      });
+    }
   }
 
   get token() {
@@ -188,11 +221,12 @@ class PocketArcadeClient {
     this.profile = null;
     this.players.clear();
     this.chatMessages = [];
-    this.game = null;
+    this.gameMatches.clear();
+    this.gameSnapshots.clear();
+    this.gameInputSequences.clear();
     this.emit("profile.changed", null);
     this.emit("presence.changed", []);
     this.emit("chat.changed", []);
-    this.emit("game.changed", null);
     this.setConnection("profile-required");
     this.emit("profile.required");
   }
@@ -208,6 +242,7 @@ class PocketArcadeClient {
     }
     const scheme = location.protocol === "https:" ? "wss" : "ws";
     const socket = new WebSocket(`${scheme}://${location.host}/ws`);
+    socket.binaryType = "arraybuffer";
     this.socket = socket;
 
     return new Promise((resolve, reject) => {
@@ -223,10 +258,15 @@ class PocketArcadeClient {
       socket.onopen = () => {
         this.send("system.hello", {
           sessionToken: this.token,
-          clientVersion: "0.1.0",
+          clientVersion: "0.3.0",
         });
       };
       socket.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          this.handleBinaryMessage(event.data);
+          return;
+        }
+        if (typeof event.data !== "string") return;
         let message;
         try { message = JSON.parse(event.data); }
         catch { return; }
@@ -266,6 +306,7 @@ class PocketArcadeClient {
       socket.onclose = () => {
         clearTimeout(timeout);
         if (this.socket === socket) this.socket = null;
+        this.clearGameConnectionState();
         if (!settled) {
           settled = true;
           reject(new Error("WebSocket closed before authentication."));
@@ -296,24 +337,169 @@ class PocketArcadeClient {
     return true;
   }
 
+  handleBinaryMessage(buffer) {
+    const HEADER_BYTES = 36;
+    const SNAPSHOT_KIND = 1;
+    if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < HEADER_BYTES) {
+      return;
+    }
+    const view = new DataView(buffer);
+    if (view.getUint8(0) !== 1 || view.getUint8(1) !== SNAPSHOT_KIND) return;
+    const flags = view.getUint8(2);
+    const appHandle = view.getUint32(4);
+    const matchHandle = view.getUint32(8);
+    const uint64 = (offset) =>
+      view.getUint32(offset) * 0x100000000 + view.getUint32(offset + 4);
+    const revision = uint64(12);
+    const serverTick = uint64(20);
+    const ackInputSeq = view.getUint32(28);
+    const payloadLength = view.getUint32(32);
+    if (payloadLength !== buffer.byteLength - HEADER_BYTES) return;
+    const match = [...this.gameMatches.values()].find((candidate) =>
+      (Number(candidate.appHandle) >>> 0) === appHandle &&
+      (Number(candidate.matchHandle) >>> 0) === matchHandle
+    );
+    if (!match) return;
+    let payload;
+    try {
+      const bytes = new Uint8Array(buffer, HEADER_BYTES, payloadLength);
+      payload = JSON.parse(new TextDecoder().decode(bytes));
+    } catch {
+      return;
+    }
+    this.handleMessage({
+      v: 1,
+      type: "game.snapshot",
+      payload: {
+        appId: match.appId,
+        matchId: match.matchId,
+        revision,
+        serverTick,
+        ackInputSeq,
+        full: Boolean(flags & 1),
+        payload,
+      },
+    });
+  }
+
   sendChat(text) {
     return this.send("chat.send", { text });
   }
 
-  joinTicTacToe() {
-    return this.send("game.tictactoe.join");
+  joinGame(appId, matchId = null) {
+    if (typeof appId !== "string" || !appId) return false;
+    return this.send("game.join", {
+      appId,
+      ...(matchId ? { matchId } : {}),
+    });
   }
 
-  playTicTacToe(cell) {
-    return this.send("game.tictactoe.move", { cell });
+  leaveGame(matchId) {
+    return this.send("game.leave", { matchId });
   }
 
-  leaveTicTacToe() {
-    return this.send("game.tictactoe.leave");
+  readyGame(matchId) {
+    return this.send("game.ready", { matchId });
   }
 
-  resetTicTacToe() {
-    return this.send("game.tictactoe.reset");
+  sendGameCommand(matchId, action, data = {}) {
+    const match = this.gameMatches.get(matchId);
+    if (!match || typeof action !== "string" || !action) return false;
+    const inputSeq = (this.gameInputSequences.get(matchId) || 0) + 1;
+    const sent = this.send("game.command", {
+      appId: match.appId,
+      matchId,
+      action,
+      inputSeq,
+      data,
+    });
+    if (sent) this.gameInputSequences.set(matchId, inputSeq);
+    return sent;
+  }
+
+  claimGameControl(matchId) {
+    return this.send("game.control.claim", { matchId });
+  }
+
+  requestGameSnapshot(matchId) {
+    return this.send("game.snapshot.request", { matchId });
+  }
+
+  createAppFacade(scopedAppId, shellDisplay = null) {
+    const belongsToApp = (payload) => payload?.appId === scopedAppId;
+    const ownsMatch = (matchId) =>
+      this.gameMatches.get(matchId)?.appId === scopedAppId;
+    const subscribe = (event, callback) => this.on(event, (payload) => {
+      if (belongsToApp(payload)) callback(payload);
+    });
+    const findMatch = () => {
+      const matches = [...this.gameMatches.values()]
+        .filter((match) => match.appId === scopedAppId)
+        .reverse();
+      return matches.find((match) =>
+        match.state !== "finished" && match.you?.role !== "none"
+      ) || matches.find((match) => match.state !== "finished")
+        || matches[0] || null;
+    };
+    const facadeGame = Object.freeze({
+      join: (appId = scopedAppId) =>
+        appId === scopedAppId && this.joinGame(scopedAppId),
+      leave: (matchId) => ownsMatch(matchId) && this.leaveGame(matchId),
+      ready: (matchId) => ownsMatch(matchId) && this.readyGame(matchId),
+      send: (matchId, action, data) =>
+        ownsMatch(matchId) && this.sendGameCommand(matchId, action, data),
+      claimControl: (matchId) =>
+        ownsMatch(matchId) && this.claimGameControl(matchId),
+      requestSnapshot: (matchId) =>
+        ownsMatch(matchId) && this.requestGameSnapshot(matchId),
+      onMatch: (callback) => subscribe("game.match", callback),
+      onSnapshot: (callback) => subscribe("game.snapshot", callback),
+      onEvent: (callback) => subscribe("game.event", callback),
+      onResult: (callback) => subscribe("game.result", callback),
+      onError: (callback) => subscribe("game.error", callback),
+      currentMatch: findMatch,
+      currentSnapshot: () => {
+        const match = findMatch();
+        return match ? this.gameSnapshots.get(match.matchId) || null : null;
+      },
+    });
+    const facadeDisplay = Object.freeze({
+      requestFullscreen: () =>
+        Boolean(shellDisplay?.requestFullscreen?.()),
+      exitFullscreen: () =>
+        Boolean(shellDisplay?.exitFullscreen?.()),
+      get fullscreen() {
+        return Boolean(shellDisplay?.isFullscreen?.());
+      },
+      onFullscreenChange: (callback) => {
+        if (typeof callback !== "function") {
+          throw new TypeError("Fullscreen callback must be a function.");
+        }
+        return shellDisplay?.onFullscreenChange?.(callback) || (() => {});
+      },
+    });
+    const client = this;
+    return Object.freeze({
+      get profile() {
+        return client.profile
+          ? Object.freeze({
+              id: client.profile.id,
+              nickname: client.profile.nickname,
+              avatarUrl: client.profile.avatarUrl || null,
+              colour: client.profile.colour || null,
+              wins: client.profile.wins || 0,
+            })
+          : null;
+      },
+      get connectionStatus() {
+        return client.connectionStatus;
+      },
+      onConnection(callback) {
+        return client.on("connection.changed", callback);
+      },
+      display: facadeDisplay,
+      game: facadeGame,
+    });
   }
 
   async refreshApps() {
@@ -364,6 +550,36 @@ class PocketArcadeClient {
     return this.waitForStorage((storage) => storage.mounted);
   }
 
+  sanitizeGameProfile(profile) {
+    if (!profile || typeof profile !== "object") return null;
+    const wins = Number(profile.wins);
+    return {
+      profileId: typeof profile.profileId === "string"
+        ? profile.profileId : "",
+      nickname: typeof profile.nickname === "string"
+        ? profile.nickname : "",
+      wins: Number.isFinite(wins) ? wins : 0,
+      avatarUrl: typeof profile.avatarUrl === "string" && profile.avatarUrl
+        ? profile.avatarUrl : null,
+    };
+  }
+
+  sanitizeGameMatch(payload) {
+    const seats = Array.isArray(payload?.seats)
+      ? payload.seats.map((seat) => ({
+          ...(seat && typeof seat === "object" ? seat : {}),
+          player: seat?.player
+            ? this.sanitizeGameProfile(seat.player) : null,
+        }))
+      : [];
+    const spectators = Array.isArray(payload?.spectators)
+      ? payload.spectators
+          .map((profile) => this.sanitizeGameProfile(profile))
+          .filter(Boolean)
+      : [];
+    return { ...payload, seats, spectators };
+  }
+
   handleMessage(message) {
     const player = message.payload.player;
     if (message.type === "presence.snapshot") {
@@ -398,12 +614,42 @@ class PocketArcadeClient {
       }
     } else if (message.type === "error.chat") {
       this.emit("chat.error", message.payload);
-    } else if (message.type === "game.tictactoe.snapshot" ||
-               message.type === "game.tictactoe.updated") {
-      this.game = message.payload;
-      this.emit("game.changed", this.game);
-    } else if (message.type === "error.game") {
-      this.emit("game.error", message.payload);
+    } else if (message.type === "game.match") {
+      if (message.payload?.matchId && message.payload?.appId) {
+        const payload = this.sanitizeGameMatch(message.payload);
+        this.gameMatches.set(payload.matchId, payload);
+        message = { ...message, payload };
+      } else return;
+    } else if (message.type === "game.snapshot") {
+      if (message.payload?.matchId && message.payload?.appId) {
+        const previous = this.gameSnapshots.get(message.payload.matchId);
+        if (!previous || Number(message.payload.revision) >=
+            Number(previous.revision)) {
+          this.gameSnapshots.set(message.payload.matchId, message.payload);
+          const acknowledged = Number(message.payload.ackInputSeq) || 0;
+          this.gameInputSequences.set(
+            message.payload.matchId,
+            Math.max(
+              acknowledged,
+              this.gameInputSequences.get(message.payload.matchId) || 0
+            )
+          );
+        }
+      } else return;
+    } else if (message.type === "game.event" ||
+               message.type === "game.result") {
+      if (!message.payload?.matchId || !message.payload?.appId) return;
+    } else if (message.type === "game.error" ||
+               message.type === "error.game") {
+      const match = message.payload?.matchId
+        ? this.gameMatches.get(message.payload.matchId) : null;
+      message = {
+        ...message,
+        payload: {
+          ...message.payload,
+          ...(message.payload?.appId || !match ? {} : { appId: match.appId }),
+        },
+      };
     }
     this.emit(message.type, message.payload);
   }

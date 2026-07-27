@@ -7,10 +7,18 @@ from pathlib import Path
 
 ROUTES = {
     "index.html": ["/", "/index.html"],
+    "portal.html": ["/portal", "/portal.html"],
     "css/app.css": ["/system/app.css"],
+    "css/portal.css": ["/system/portal.css"],
     "js/pocket-arcade.js": ["/system/pocket-arcade.js"],
     "js/app.js": ["/system/app.js"],
     "assets/icon.svg": ["/assets/system/icon.svg"],
+    "assets/portal-horizontal.jpg": [
+        "/assets/system/portal-horizontal.jpg"
+    ],
+    "assets/portal-vertical.jpg": [
+        "/assets/system/portal-vertical.jpg"
+    ],
 }
 
 MIME = {
@@ -18,6 +26,7 @@ MIME = {
     ".css": "text/css; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
     ".svg": "image/svg+xml",
+    ".jpg": "image/jpeg",
 }
 
 
@@ -34,9 +43,11 @@ def generate(input_dir: Path, output: Path) -> None:
     for relative, routes in ROUTES.items():
         source = input_dir / relative
         raw = source.read_bytes()
-        # Keep the navigation document uncompressed for compatibility with
-        # minimal captive-portal browsers. Larger subresources remain gzip.
-        encoding = None if source.suffix == ".html" else "gzip"
+        # Keep navigation documents and already-compressed images uncompressed
+        # for compatibility with minimal captive-portal browsers.
+        encoding = (
+            "gzip" if source.suffix in {".css", ".js", ".svg"} else None
+        )
         prepared = (
             gzip.compress(raw, compresslevel=9, mtime=0)
             if encoding

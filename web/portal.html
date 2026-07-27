@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+        content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#08051a">
+  <meta name="color-scheme" content="dark">
+  <title>Welcome to PocketArcade</title>
+  <link rel="icon" href="/assets/system/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/system/portal.css">
+</head>
+<body>
+  <picture class="portal-art" aria-hidden="true">
+    <source media="(orientation: portrait)"
+            srcset="/assets/system/portal-vertical.jpg">
+    <img src="/assets/system/portal-horizontal.jpg" alt="">
+  </picture>
+
+  <main class="portal-overlay" aria-labelledby="portal-title">
+    <section class="portal-card">
+      <p class="eyebrow">LOCAL MULTIPLAYER</p>
+      <h1 id="portal-title">Welcome to PocketArcade</h1>
+      <p id="portal-summary">
+        Play games with everyone connected to this PocketArcade Wi-Fi.
+        No internet required.
+      </p>
+      <a class="start-button" href="http://192.168.4.1/" target="_blank"
+         rel="noopener external" referrerpolicy="no-referrer"
+         aria-describedby="portal-summary browser-help">Start</a>
+      <p id="browser-help" class="browser-help">
+        Opens the arcade in your browser. If this sign-in window remains,
+        use its <strong>Open in browser</strong> command.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

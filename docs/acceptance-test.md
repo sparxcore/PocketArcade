@@ -20,10 +20,14 @@ For an AI-Thinker ESP32-CAM, build with
 - [ ] `PocketArcade` appears as an open network by default.
 - [ ] Configuring an 8–63-byte password enables WPA2/WPA3 protection.
 - [ ] Client receives `192.168.4.x`; gateway is `192.168.4.1`.
-- [ ] Android captive check opens/redirects without a loop.
-- [ ] `/captive-portal` returns `application/captive+json` with `captive: true`.
-- [ ] Apple captive check opens/redirects without a loop.
-- [ ] Windows captive check opens/redirects without a loop.
+- [ ] Android captive check opens `/portal` without a redirect loop.
+- [ ] `/captive-portal` returns `application/captive+json` with `captive: true`
+      and a `/portal` `user-portal-url`.
+- [ ] Apple captive check opens `/portal` without a redirect loop.
+- [ ] Windows captive check opens `/portal` without a redirect loop.
+- [ ] The welcome artwork selects portrait and landscape variants correctly.
+- [ ] **Start** requests `/` in a new browser context; where an OS keeps it in
+      the captive window, the fallback browser instruction is visible.
 - [ ] `http://192.168.4.1/` always loads.
 - [ ] Association/disassociation does not reboot the ESP32.
 - [ ] No full MAC appears at normal log level.
@@ -36,6 +40,22 @@ For an AI-Thinker ESP32-CAM, build with
 - [ ] Create/edit a nickname and enter lobby.
 - [ ] Restart proves a temporary profile is gone without causing a crash.
 - [ ] No app manifest or card content can replace `/` or `/system/*`.
+
+## Application fullscreen presentation
+
+- [ ] Opening an application leaves it embedded in the lobby.
+- [ ] Calling `arcade.display.requestFullscreen()` from the active application
+      expands its host to the complete browser viewport.
+- [ ] The shell-owned **Exit fullscreen** control remains visible and restores
+      the embedded view without closing the application.
+- [ ] Escape restores the embedded view on a device with a keyboard.
+- [ ] Calling `arcade.display.exitFullscreen()` restores the embedded view.
+- [ ] Closing or replacing the application, changing profile, or a failed
+      mount always restores the normal shell.
+- [ ] A timer or retained facade from an unmounted application cannot enter or
+      exit fullscreen for the currently mounted application.
+- [ ] Fullscreen layout respects display safe areas and remains usable in
+      portrait and landscape orientations.
 
 ## Profiles and recognition
 
@@ -82,6 +102,34 @@ For an AI-Thinker ESP32-CAM, build with
 - [ ] X/O can join and make only valid alternating moves.
 - [ ] A third player sees every update as a spectator.
 - [ ] The SD application opens no additional WebSocket.
+
+## Phase 3 realtime application: PocketBlocks
+
+- [ ] Copy `sdcard-example/apps/pocketblocks` to `/apps/pocketblocks`.
+- [ ] The catalogue reports a Lua tick runtime at 20 Hz and a 15 Hz effective
+      snapshot rate.
+- [ ] Four different profiles occupy exactly four seats from four phones.
+- [ ] A fifth profile is admitted only as a spectator.
+- [ ] Two tabs for one profile share one seat and only the controller tab can
+      submit commands.
+- [ ] Explicit control claim moves command authority to the claiming tab.
+- [ ] Stale and duplicate input sequences receive `game.error` and do not
+      change state.
+- [ ] Browser rendering remains smooth between authoritative binary snapshots.
+- [ ] Binary snapshot revisions increase monotonically and acknowledge the
+      last processed input sequence for each player.
+- [ ] Disconnect and reconnect inside the grace period restores the same seat
+      and immediately receives a full authoritative snapshot.
+- [ ] Suspending one client long enough to create backpressure retains only the
+      newest pending snapshot and does not grow memory without bound.
+- [ ] A consistently slow client is closed without disconnecting other players.
+- [ ] Scheduler stalls run at most one catch-up tick and report dropped ticks.
+- [ ] A Lua callback overrun is reported without resetting Wi-Fi or the ESP32.
+- [ ] A Lua instruction, memory, or callback failure stops only its match.
+- [ ] The final visual snapshot arrives before `game.result`, and the result is
+      recorded exactly once.
+- [ ] Removing/ejecting the SD card stops or suspends the game safely without
+      affecting the embedded lobby.
 
 ## SD storage
 

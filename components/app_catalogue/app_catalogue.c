@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -17,17 +18,7 @@ static const char *TAG = "APPS";
 #define MAX_APPS 12
 #define MAX_MANIFEST_BYTES 4096
 
-typedef struct {
-    bool used;
-    char id[49];
-    char name[65];
-    char description[161];
-    char entrypoint[97];
-    char stylesheet[97];
-    char kind[17];
-} cached_app_t;
-
-static cached_app_t apps[MAX_APPS];
+static app_descriptor_t apps[MAX_APPS];
 static size_t app_count;
 static SemaphoreHandle_t apps_lock;
 
@@ -45,7 +36,13 @@ typedef enum {
     MANIFEST_INVALID_ENTRYPOINT,
     MANIFEST_INVALID_DESCRIPTION,
     MANIFEST_INVALID_STYLESHEET,
-    MANIFEST_INVALID_KIND
+    MANIFEST_INVALID_KIND,
+    MANIFEST_PLATFORM_TOO_OLD,
+    MANIFEST_INVALID_RUNTIME,
+    MANIFEST_INVALID_MULTIPLAYER,
+    MANIFEST_INVALID_PROTOCOL,
+    MANIFEST_INVALID_CAPABILITY,
+    MANIFEST_SCRIPT_TOO_LARGE
 } manifest_result_t;
 
 static const char *manifest_result_name(manifest_result_t result)
@@ -56,7 +53,8 @@ static const char *manifest_result_name(manifest_result_t result)
         case MANIFEST_IO_ERROR: return "manifest read failed";
         case MANIFEST_TOO_LARGE: return "manifest size is invalid";
         case MANIFEST_INVALID_JSON: return "manifest JSON is invalid";
-        case MANIFEST_INVALID_VERSION: return "manifestVersion must be 1";
+        case MANIFEST_INVALID_VERSION:
+            return "manifestVersion must be 1 or 2";
         case MANIFEST_INVALID_ID: return "application id is invalid";
         case MANIFEST_DIRECTORY_ID_MISMATCH: return "directory and id differ";
         case MANIFEST_INVALID_NAME: return "name must be a bounded string";
@@ -68,6 +66,18 @@ static const char *manifest_result_name(manifest_result_t result)
             return "stylesheet must be a safe relative path or null";
         case MANIFEST_INVALID_KIND:
             return "kind must be a bounded string or null";
+        case MANIFEST_PLATFORM_TOO_OLD:
+            return "minPlatformVersion is newer than this firmware";
+        case MANIFEST_INVALID_RUNTIME:
+            return "runtime metadata is invalid or unsupported";
+        case MANIFEST_INVALID_MULTIPLAYER:
+            return "multiplayer metadata is invalid";
+        case MANIFEST_INVALID_PROTOCOL:
+            return "application protocol version is unsupported";
+        case MANIFEST_INVALID_CAPABILITY:
+            return "a requested capability is unsupported";
+        case MANIFEST_SCRIPT_TOO_LARGE:
+            return "runtime script exceeds the firmware limit";
         default: return "valid";
     }
 }
@@ -141,8 +151,73 @@ static bool app_file_exists(const char *directory_name, const char *relative)
     return access(path, R_OK) == 0;
 }
 
+static bool semantic_version(const char *text, unsigned output[3])
+{
+    char trailing = '\0';
+    return text && sscanf(text, "%u.%u.%u%c",
+                          &output[0], &output[1], &output[2],
+                          &trailing) == 3;
+}
+
+static bool platform_version_supported(const char *minimum)
+{
+    unsigned requested[3];
+    unsigned platform[3];
+    if (!semantic_version(minimum, requested) ||
+        !semantic_version(PA_FIRMWARE_VERSION, platform)) return false;
+    for (size_t i = 0; i < 3; ++i) {
+        if (requested[i] < platform[i]) return true;
+        if (requested[i] > platform[i]) return false;
+    }
+    return true;
+}
+
+static bool json_integer(cJSON *root, const char *key, int *output)
+{
+    cJSON *item = cJSON_GetObjectItemCaseSensitive(root, key);
+    if (!cJSON_IsNumber(item) || item->valuedouble != item->valueint) {
+        return false;
+    }
+    *output = item->valueint;
+    return true;
+}
+
+static bool runtime_script_valid(const char *directory_name,
+                                 const char *relative)
+{
+    char path[256];
+    snprintf(path, sizeof(path), "%s/apps/%s/%s",
+             PA_SD_MOUNT_POINT, directory_name, relative);
+    struct stat info;
+    return stat(path, &info) == 0 && info.st_size > 0 &&
+           info.st_size <= CONFIG_PA_GAME_MAX_SCRIPT_BYTES;
+}
+
+static bool parse_capabilities(cJSON *root, uint32_t *capabilities)
+{
+    cJSON *array = cJSON_GetObjectItemCaseSensitive(root, "capabilities");
+    if (!cJSON_IsArray(array) || cJSON_GetArraySize(array) > 8) return false;
+    *capabilities = 0;
+    cJSON *item;
+    cJSON_ArrayForEach(item, array) {
+        if (!cJSON_IsString(item) || !item->valuestring) return false;
+        if (strcmp(item->valuestring, "presence.read") == 0) {
+            *capabilities |= APP_CAP_PRESENCE_READ;
+        } else if (strcmp(item->valuestring, "match.seats") == 0) {
+            *capabilities |= APP_CAP_MATCH_SEATS;
+        } else if (strcmp(item->valuestring, "match.results") == 0) {
+            *capabilities |= APP_CAP_MATCH_RESULTS;
+        } else if (strcmp(item->valuestring, "storage.app-data") == 0) {
+            *capabilities |= APP_CAP_STORAGE_APP_DATA;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
 static manifest_result_t load_manifest(const char *directory_name,
-                                       cached_app_t *app)
+                                       app_descriptor_t *app)
 {
     char normalised_id[49];
     if (!normalise_directory_id(directory_name, normalised_id)) {
@@ -185,10 +260,12 @@ static manifest_result_t load_manifest(const char *directory_name,
         return MANIFEST_INVALID_JSON;
     }
     cJSON *version = cJSON_GetObjectItemCaseSensitive(root, "manifestVersion");
-    if (!cJSON_IsNumber(version) || version->valueint != 1) {
+    if (!cJSON_IsNumber(version) ||
+        (version->valueint != 1 && version->valueint != 2)) {
         cJSON_Delete(root);
         return MANIFEST_INVALID_VERSION;
     }
+    app->manifest_version = version->valueint;
     if (!json_string(root, "id", app->id, sizeof(app->id), true) ||
         !storage_valid_app_id(app->id)) {
         cJSON_Delete(root);
@@ -202,15 +279,22 @@ static manifest_result_t load_manifest(const char *directory_name,
         cJSON_Delete(root);
         return MANIFEST_INVALID_NAME;
     }
-    if (!json_app_path(root, "entrypoint", "entrypointUrl", app->id,
-                       app->entrypoint, sizeof(app->entrypoint), true) ||
+    cJSON *client = app->manifest_version == 2
+                        ? cJSON_GetObjectItemCaseSensitive(root, "client")
+                        : root;
+    if (!cJSON_IsObject(client) ||
+        !json_app_path(client, "entrypoint",
+                       app->manifest_version == 1 ? "entrypointUrl" : NULL,
+                       app->id, app->entrypoint,
+                       sizeof(app->entrypoint), true) ||
         !app_file_exists(bounded_directory, app->entrypoint)) {
         /*
          * Compatibility for the v0.1 development package that briefly used
          * a different entrypoint field. The fixed fallback is accepted only
          * when the file exists inside this already-validated app directory.
          */
-        if (app_file_exists(bounded_directory, "app.js")) {
+        if (app->manifest_version == 1 &&
+            app_file_exists(bounded_directory, "app.js")) {
             strlcpy(app->entrypoint, "app.js", sizeof(app->entrypoint));
             ESP_LOGW(TAG, "App %.48s uses legacy entrypoint metadata",
                      normalised_id);
@@ -224,7 +308,9 @@ static manifest_result_t load_manifest(const char *directory_name,
         cJSON_Delete(root);
         return MANIFEST_INVALID_DESCRIPTION;
     }
-    if (!json_app_path(root, "stylesheet", "stylesheetUrl", app->id,
+    if (!json_app_path(client, "stylesheet",
+                       app->manifest_version == 1 ? "stylesheetUrl" : NULL,
+                       app->id,
                        app->stylesheet, sizeof(app->stylesheet), false) ||
         (app->stylesheet[0] &&
          !app_file_exists(bounded_directory, app->stylesheet))) {
@@ -234,6 +320,122 @@ static manifest_result_t load_manifest(const char *directory_name,
         cJSON_Delete(root);
         return MANIFEST_INVALID_KIND;
     }
+
+    if (app->manifest_version == 1) {
+        strlcpy(app->version, "0.1.0", sizeof(app->version));
+        strlcpy(app->runtime_type, "native", sizeof(app->runtime_type));
+        app->runtime_mode = APP_RUNTIME_EVENT;
+        app->min_players = 2;
+        app->max_players = 2;
+        app->spectators = true;
+        app->late_join = APP_LATE_JOIN_SPECTATOR;
+        app->reconnect_grace_ms = CONFIG_PA_PRESENCE_GRACE_MS;
+        app->protocol_version = PA_PROTOCOL_VERSION;
+    } else {
+        char minimum_version[PA_APP_VERSION_MAX + 1];
+        if (!json_string(root, "version", app->version,
+                         sizeof(app->version), true) ||
+            !semantic_version(app->version, (unsigned[3]){0}) ||
+            !json_string(root, "minPlatformVersion", minimum_version,
+                         sizeof(minimum_version), true) ||
+            !platform_version_supported(minimum_version)) {
+            cJSON_Delete(root);
+            return MANIFEST_PLATFORM_TOO_OLD;
+        }
+        cJSON *runtime =
+            cJSON_GetObjectItemCaseSensitive(root, "runtime");
+        char mode[9];
+        int tick_rate = 0;
+        if (!cJSON_IsObject(runtime) ||
+            !json_string(runtime, "type", app->runtime_type,
+                         sizeof(app->runtime_type), true) ||
+            strcmp(app->runtime_type, "lua") != 0 ||
+            !json_app_path(runtime, "entrypoint", NULL, app->id,
+                           app->runtime_entrypoint,
+                           sizeof(app->runtime_entrypoint), true) ||
+            !runtime_script_valid(bounded_directory,
+                                  app->runtime_entrypoint) ||
+            !json_string(runtime, "mode", mode, sizeof(mode), true)) {
+            cJSON_Delete(root);
+            return runtime_script_valid(bounded_directory,
+                                        app->runtime_entrypoint)
+                       ? MANIFEST_INVALID_RUNTIME
+                       : MANIFEST_SCRIPT_TOO_LARGE;
+        }
+        if (strcmp(mode, "event") == 0) {
+            app->runtime_mode = APP_RUNTIME_EVENT;
+            app->tick_rate_hz = 0;
+        } else if (strcmp(mode, "tick") == 0 &&
+                   json_integer(runtime, "tickRateHz", &tick_rate) &&
+                   tick_rate > 0) {
+            app->runtime_mode = APP_RUNTIME_TICK;
+            app->tick_rate_hz =
+                tick_rate > CONFIG_PA_GAME_MAX_TICK_RATE_HZ
+                    ? CONFIG_PA_GAME_MAX_TICK_RATE_HZ
+                    : (uint8_t)tick_rate;
+        } else {
+            cJSON_Delete(root);
+            return MANIFEST_INVALID_RUNTIME;
+        }
+
+        cJSON *multiplayer =
+            cJSON_GetObjectItemCaseSensitive(root, "multiplayer");
+        int min_players;
+        int max_players;
+        int reconnect_grace;
+        char late_join[17];
+        cJSON *spectators =
+            cJSON_GetObjectItemCaseSensitive(multiplayer, "spectators");
+        if (!cJSON_IsObject(multiplayer) ||
+            !json_integer(multiplayer, "minPlayers", &min_players) ||
+            !json_integer(multiplayer, "maxPlayers", &max_players) ||
+            !cJSON_IsBool(spectators) ||
+            !json_string(multiplayer, "lateJoin", late_join,
+                         sizeof(late_join), true) ||
+            !json_integer(multiplayer, "reconnectGraceMs",
+                          &reconnect_grace) ||
+            min_players < 1 || max_players < 1 ||
+            reconnect_grace < 0) {
+            cJSON_Delete(root);
+            return MANIFEST_INVALID_MULTIPLAYER;
+        }
+        app->min_players =
+            min_players > CONFIG_PA_GAME_MAX_PLAYERS
+                ? CONFIG_PA_GAME_MAX_PLAYERS : (uint8_t)min_players;
+        app->max_players =
+            max_players > CONFIG_PA_GAME_MAX_PLAYERS
+                ? CONFIG_PA_GAME_MAX_PLAYERS : (uint8_t)max_players;
+        if (app->min_players > app->max_players) {
+            cJSON_Delete(root);
+            return MANIFEST_INVALID_MULTIPLAYER;
+        }
+        app->spectators = cJSON_IsTrue(spectators);
+        if (strcmp(late_join, "spectator") == 0) {
+            app->late_join = APP_LATE_JOIN_SPECTATOR;
+        } else if (strcmp(late_join, "reject") == 0) {
+            app->late_join = APP_LATE_JOIN_REJECT;
+        } else {
+            cJSON_Delete(root);
+            return MANIFEST_INVALID_MULTIPLAYER;
+        }
+        app->reconnect_grace_ms =
+            reconnect_grace > 60000 ? 60000 : (uint32_t)reconnect_grace;
+
+        cJSON *protocol =
+            cJSON_GetObjectItemCaseSensitive(root, "protocol");
+        int protocol_version;
+        if (!cJSON_IsObject(protocol) ||
+            !json_integer(protocol, "version", &protocol_version) ||
+            protocol_version != PA_PROTOCOL_VERSION) {
+            cJSON_Delete(root);
+            return MANIFEST_INVALID_PROTOCOL;
+        }
+        app->protocol_version = (uint8_t)protocol_version;
+        if (!parse_capabilities(root, &app->capabilities)) {
+            cJSON_Delete(root);
+            return MANIFEST_INVALID_CAPABILITY;
+        }
+    }
     cJSON_Delete(root);
     app->used = true;
     return MANIFEST_OK;
@@ -241,7 +443,7 @@ static manifest_result_t load_manifest(const char *directory_name,
 
 static void scan_catalogue(void)
 {
-    cached_app_t *found = calloc(MAX_APPS, sizeof(*found));
+    app_descriptor_t *found = calloc(MAX_APPS, sizeof(*found));
     if (!found) {
         ESP_LOGE(TAG, "No memory for application catalogue scan");
         return;
@@ -303,13 +505,16 @@ cJSON *app_catalogue_response(void)
     cJSON *array = cJSON_AddArrayToObject(root, "apps");
     xSemaphoreTake(apps_lock, portMAX_DELAY);
     for (size_t i = 0; i < app_count; ++i) {
-        const cached_app_t *app = &apps[i];
+        const app_descriptor_t *app = &apps[i];
         cJSON *json = cJSON_CreateObject();
         cJSON_AddStringToObject(json, "id", app->id);
         cJSON_AddStringToObject(json, "name", app->name);
         cJSON_AddStringToObject(json, "description", app->description);
         cJSON_AddStringToObject(json, "kind",
                                 app->kind[0] ? app->kind : "application");
+        cJSON_AddNumberToObject(json, "manifestVersion",
+                                app->manifest_version);
+        cJSON_AddStringToObject(json, "version", app->version);
         char url[180];
         snprintf(url, sizeof(url), "/apps/%s/%s", app->id, app->entrypoint);
         cJSON_AddStringToObject(json, "entrypointUrl", url);
@@ -320,10 +525,72 @@ cJSON *app_catalogue_response(void)
         } else {
             cJSON_AddNullToObject(json, "stylesheetUrl");
         }
+        if (app->manifest_version == 2) {
+            cJSON *runtime = cJSON_AddObjectToObject(json, "runtime");
+            cJSON_AddStringToObject(runtime, "type", app->runtime_type);
+            cJSON_AddStringToObject(
+                runtime, "mode",
+                app->runtime_mode == APP_RUNTIME_TICK ? "tick" : "event");
+            cJSON_AddNumberToObject(runtime, "tickRateHz",
+                                    app->tick_rate_hz);
+            cJSON_AddNumberToObject(
+                runtime, "snapshotRateHz",
+                app->runtime_mode == APP_RUNTIME_TICK
+                    ? (app->tick_rate_hz <
+                               CONFIG_PA_GAME_MAX_SNAPSHOT_RATE_HZ
+                           ? app->tick_rate_hz
+                           : CONFIG_PA_GAME_MAX_SNAPSHOT_RATE_HZ)
+                    : 0);
+            cJSON *multiplayer =
+                cJSON_AddObjectToObject(json, "multiplayer");
+            cJSON_AddNumberToObject(multiplayer, "minPlayers",
+                                    app->min_players);
+            cJSON_AddNumberToObject(multiplayer, "maxPlayers",
+                                    app->max_players);
+            cJSON_AddBoolToObject(multiplayer, "spectators",
+                                  app->spectators);
+            cJSON_AddStringToObject(
+                multiplayer, "lateJoin",
+                app->late_join == APP_LATE_JOIN_SPECTATOR
+                    ? "spectator" : "reject");
+            cJSON *limits =
+                cJSON_AddObjectToObject(json, "resourceLimits");
+            cJSON_AddNumberToObject(limits, "runtimeMemoryBytes",
+                                    CONFIG_PA_GAME_RUNTIME_MEMORY_BYTES);
+            cJSON_AddNumberToObject(limits, "commandBytes",
+                                    CONFIG_PA_GAME_MAX_COMMAND_BYTES);
+            cJSON_AddNumberToObject(limits, "snapshotBytes",
+                                    CONFIG_PA_GAME_MAX_SNAPSHOT_BYTES);
+            cJSON_AddNumberToObject(
+                limits, "commandsPerSecond",
+                CONFIG_PA_GAME_COMMANDS_PER_SECOND);
+            cJSON_AddNumberToObject(
+                limits, "snapshotRateHz",
+                CONFIG_PA_GAME_MAX_SNAPSHOT_RATE_HZ);
+            cJSON_AddNumberToObject(
+                limits, "outboundCriticalMessages",
+                CONFIG_PA_WS_OUTBOUND_QUEUE_LENGTH);
+        }
         cJSON_AddItemToArray(array, json);
     }
     xSemaphoreGive(apps_lock);
     return root;
+}
+
+bool app_catalogue_get(const char *id, app_descriptor_t *application)
+{
+    if (!id || !application) return false;
+    bool found = false;
+    xSemaphoreTake(apps_lock, portMAX_DELAY);
+    for (size_t i = 0; i < app_count; ++i) {
+        if (strcmp(apps[i].id, id) == 0) {
+            *application = apps[i];
+            found = true;
+            break;
+        }
+    }
+    xSemaphoreGive(apps_lock);
+    return found;
 }
 
 void app_catalogue_invalidate(void)
@@ -400,6 +667,7 @@ static esp_err_t serve_app_asset(httpd_req_t *request)
     }
     httpd_resp_set_type(request, mime_for_path(relative));
     httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
+    httpd_resp_set_hdr(request, "Connection", "close");
     httpd_resp_set_hdr(request, "Cache-Control",
                        "public, max-age=60, must-revalidate");
     char buffer[1024];

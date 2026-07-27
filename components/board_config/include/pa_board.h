@@ -3,7 +3,7 @@
 #include "sdkconfig.h"
 
 #define PA_PRODUCT_NAME "PocketArcade"
-#define PA_FIRMWARE_VERSION "0.1.0"
+#define PA_FIRMWARE_VERSION "0.3.0"
 #define PA_PROTOCOL_VERSION 1
 #define PA_GATEWAY_STRING "192.168.4.1"
 #define PA_SD_MOUNT_POINT "/sdcard"
@@ -14,3 +14,8 @@
 #define PA_PROFILE_ID_LEN 18
 #define PA_CONNECTION_ID_LEN 18
 #define PA_AVATAR_URL_LEN 64
+#define PA_APP_ID_MAX 48
+#define PA_APP_VERSION_MAX 31
+#define PA_APP_PATH_MAX 96
+#define PA_MATCH_ID_MAX 24
+#define PA_GAME_ACTION_MAX 32

@@ -87,6 +87,116 @@ config PA_WS_MESSAGES_PER_SECOND
     range 1 100
     default 20
 
+config PA_WS_OUTBOUND_QUEUE_LENGTH
+    int "Critical outbound messages per WebSocket"
+    range 2 16
+    default 8
+
+config PA_WS_SLOW_CLIENT_STRIKES
+    int "Queue-pressure strikes before closing a slow WebSocket"
+    range 4 128
+    default 24
+
+config PA_WS_OUTBOUND_TASK_STACK_BYTES
+    int "WebSocket outbound worker stack size"
+    range 3072 8192
+    default 4096
+
+config PA_WS_OUTBOUND_TASK_PRIORITY
+    int "WebSocket outbound worker priority"
+    range 1 10
+    default 4
+
+config PA_GAME_MAX_MATCHES
+    int "Maximum active game matches"
+    range 1 4
+    default 1
+
+config PA_GAME_MAX_PLAYERS
+    int "Maximum player seats per match"
+    range 1 4
+    default 4
+
+config PA_GAME_MAX_SPECTATORS
+    int "Maximum spectators per match"
+    range 1 8
+    default 4
+
+config PA_GAME_MAX_TICK_RATE_HZ
+    int "Maximum authoritative game tick rate"
+    range 1 30
+    default 30
+
+config PA_GAME_MAX_SNAPSHOT_RATE_HZ
+    int "Maximum game snapshot rate"
+    range 1 15
+    default 15
+
+config PA_GAME_COMMANDS_PER_SECOND
+    int "Maximum commands per second per profile"
+    range 1 50
+    default 20
+
+config PA_GAME_MAX_COMMAND_BYTES
+    int "Maximum game-defined command data"
+    range 128 2048
+    default 1024
+
+config PA_GAME_MAX_SNAPSHOT_BYTES
+    int "Maximum game-defined snapshot payload"
+    range 256 8192
+    default 4096
+
+config PA_GAME_COMMAND_QUEUE_LENGTH
+    int "Bounded game runtime work queue length"
+    range 4 32
+    default 12
+
+config PA_GAME_TASK_STACK_BYTES
+    int "Game runtime worker stack size"
+    range 4096 16384
+    default 6144
+
+config PA_GAME_TASK_PRIORITY
+    int "Game runtime worker priority"
+    range 1 10
+    default 5
+
+config PA_GAME_MAX_SCRIPT_BYTES
+    int "Maximum SD-hosted game script size"
+    range 4096 262144
+    default 65536
+
+config PA_GAME_RUNTIME_MEMORY_BYTES
+    int "Per-match runtime memory quota"
+    range 32768 524288
+    default 131072
+
+config PA_GAME_LUA_INSTRUCTION_LIMIT
+    int "Lua instructions per callback"
+    range 1000 1000000
+    default 100000
+
+config PA_GAME_LUA_CALLBACK_TIMEOUT_MS
+    int "Lua callback execution limit (ms)"
+    range 1 1000
+    default 50
+    help
+        Wall-clock safety limit for one protected Lua callback. The
+        instruction limit remains the primary bound for Lua code; this wider
+        deadline allows normal scheduler preemption and optional PSRAM latency
+        without terminating a healthy realtime match.
+
+config PA_GAME_STORAGE_KEY_BYTES
+    int "Maximum application storage key length"
+    range 8 64
+    default 48
+
+config PA_GAME_STORAGE_RECORD_BYTES
+    int "Maximum application storage record"
+    range 256 16384
+    default 4096
+
 config PA_PROFILE_MUTATION_INTERVAL_MS
     int "Minimum interval between profile changes"
     range 0 10000

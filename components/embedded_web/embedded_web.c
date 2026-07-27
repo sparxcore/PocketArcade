@@ -38,6 +38,7 @@ static esp_err_t serve_asset(httpd_req_t *request)
         httpd_resp_set_hdr(request, "Vary", "Accept-Encoding");
     }
     httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
+    httpd_resp_set_hdr(request, "Connection", "close");
     httpd_resp_set_hdr(request, "Content-Security-Policy",
                        "default-src 'self'; connect-src 'self' ws:; "
                        "img-src 'self' data: blob:; style-src 'self'; "
@@ -51,8 +52,20 @@ static esp_err_t serve_asset(httpd_req_t *request)
     ESP_LOGI(TAG, "Serving %s (%u bytes%s)", request->uri,
              (unsigned)asset->length,
              asset->encoding ? ", gzip" : "");
-    return httpd_resp_send(request, (const char *)asset->data,
-                           (ssize_t)asset->length);
+    /*
+     * Keep each socket write below the TCP window. This lets the lobby remain
+     * loadable while an authoritative runtime is active without allocating or
+     * attempting one multi-kilobyte send for the navigation document.
+     */
+    const size_t chunk_size = 1024;
+    for (size_t offset = 0; offset < asset->length; offset += chunk_size) {
+        size_t remaining = asset->length - offset;
+        size_t length = remaining < chunk_size ? remaining : chunk_size;
+        esp_err_t result = httpd_resp_send_chunk(
+            request, (const char *)asset->data + offset, length);
+        if (result != ESP_OK) return result;
+    }
+    return httpd_resp_send_chunk(request, NULL, 0);
 }
 
 esp_err_t embedded_web_register(httpd_handle_t server)

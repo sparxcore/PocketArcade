@@ -16,7 +16,6 @@
 #include "profiles.h"
 #include "storage.h"
 #include "system_state.h"
-#include "tic_tac_toe.h"
 #include "websocket.h"
 #include "wifi_ap.h"
 
@@ -42,7 +41,6 @@ void app_main(void)
     ESP_ERROR_CHECK(profile_store_init());
     ESP_ERROR_CHECK(presence_init());
     ESP_ERROR_CHECK(chat_init());
-    ESP_ERROR_CHECK(tic_tac_toe_init());
     ESP_ERROR_CHECK(app_catalogue_init());
     ESP_ERROR_CHECK(wifi_ap_start());
     ESP_ERROR_CHECK(captive_portal_start());
