@@ -1,7 +1,5 @@
 # PocketArcade Contributor Licence Agreement
 
-> **Legal-review notice:** This is a practical starting template, not a substitute for advice from a solicitor. AIGENUITY LTD should have this agreement reviewed before collecting signatures or relying on it for commercial relicensing.
-
 This Contributor Licence Agreement (“Agreement”) is between the person or legal entity submitting a Contribution (“Contributor”) and AIGENUITY LTD, a company incorporated in the United Kingdom (“Company”).
 
 ## 1. Contribution
