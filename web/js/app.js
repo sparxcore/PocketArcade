@@ -6,6 +6,25 @@ const views = ["loading-view", "setup-view", "lobby-view", "fatal-view"];
 const loadedAppScripts = new Set();
 let unmountActiveApp = null;
 let activeAppSession = null;
+let chatCollapsed = true;
+let chatInitialised = false;
+let seenChatIds = new Set();
+let unreadChatIds = new Set();
+let adminStatsTimer = null;
+let adminStatsRefreshing = false;
+let playerPlacementsInitialised = false;
+let previousPlayerPlacements = new Map();
+let previousPlayerWins = new Map();
+const pendingPlacementCelebrations = new Map();
+let playerListVisible = false;
+const appViewStorageKey = "pocketarcade.appView";
+let appListView = "list";
+try {
+  appListView = localStorage.getItem(appViewStorageKey) === "grid"
+    ? "grid" : "list";
+} catch {
+  /* Captive-portal browsers may disable local storage. */
+}
 
 function showView(id) {
   for (const view of views) byId(view).hidden = view !== id;
@@ -91,6 +110,76 @@ function renderConnection(status) {
       : "PocketArcade connection status.";
   if (status === "connected") pill.classList.add("connected");
   if (status === "reconnecting") pill.classList.add("reconnecting");
+  if (status === "connected") {
+    arcade.setOpenApp(activeAppSession?.appId || null);
+  }
+}
+
+function clampPercent(value) {
+  return Math.min(100, Math.max(0, Number(value) || 0));
+}
+
+function formatBytes(value) {
+  const bytes = Math.max(0, Number(value) || 0);
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let amount = bytes;
+  let unit = 0;
+  while (amount >= 1024 && unit < units.length - 1) {
+    amount /= 1024;
+    unit += 1;
+  }
+  const decimals = unit === 0 || amount >= 100 ? 0 : amount >= 10 ? 1 : 2;
+  return `${amount.toFixed(decimals)} ${units[unit]}`;
+}
+
+function renderGauge(name, percent, detail, available = true) {
+  const gauge = byId(`${name}-gauge`);
+  const value = byId(`${name}-gauge-value`);
+  const rounded = Math.round(clampPercent(percent));
+  gauge.style.setProperty("--gauge-value", available ? String(rounded) : "0");
+  gauge.classList.toggle("is-unavailable", !available);
+  value.textContent = available ? `${rounded}%` : "—";
+  byId(`${name}-gauge-detail`).textContent = detail;
+  if (available) {
+    gauge.setAttribute("aria-valuenow", String(rounded));
+    gauge.setAttribute("aria-valuetext", `${rounded}%; ${detail}`);
+  } else {
+    gauge.removeAttribute("aria-valuenow");
+    gauge.setAttribute("aria-valuetext", detail);
+  }
+}
+
+function renderAdminMetrics(health, storage) {
+  const cpuReady = Boolean(health?.cpuSampleReady);
+  renderGauge(
+    "cpu",
+    health?.cpuUsagePercent,
+    cpuReady ? "Current load" : "Sampling…",
+    cpuReady
+  );
+
+  const ramTotal = Math.max(0, Number(health?.ramTotalBytes) || 0);
+  const ramFree = Math.min(
+    ramTotal, Math.max(0, Number(health?.ramFreeBytes) || 0));
+  const ramUsed = ramTotal - ramFree;
+  renderGauge(
+    "ram",
+    ramTotal ? ramUsed / ramTotal * 100 : 0,
+    ramTotal ? `${formatBytes(ramFree)} free` : "Unavailable",
+    ramTotal > 0
+  );
+
+  const sdMounted = Boolean(storage?.mounted);
+  const sdTotal = Math.max(0, Number(storage?.capacityBytes) || 0);
+  const sdFree = Math.min(
+    sdTotal, Math.max(0, Number(storage?.freeBytes) || 0));
+  const sdUsed = sdTotal - sdFree;
+  renderGauge(
+    "sd",
+    sdTotal ? sdUsed / sdTotal * 100 : 0,
+    sdMounted && sdTotal ? `${formatBytes(sdFree)} free` : "Not mounted",
+    sdMounted && sdTotal > 0
+  );
 }
 
 function renderStorage(storage) {
@@ -98,15 +187,6 @@ function renderStorage(storage) {
   const safeToRemove = Boolean(storage?.safeToRemove);
   const action = byId("storage-action");
   byId("storage-notice").hidden = mounted;
-  byId("storage-indicator").classList.toggle("ok", mounted);
-  byId("storage-title").textContent = mounted
-    ? "SD storage available"
-    : safeToRemove ? "Safe to remove SD card" : "RAM-only mode";
-  byId("storage-detail").textContent = mounted
-    ? `${String(storage.interface || "SD").toUpperCase()} · Profiles, chat and games available`
-    : safeToRemove
-      ? "Remove the card now; choose Mount after reinserting it"
-      : "Core lobby and temporary profiles remain available";
   const isAdmin = arcade.profile?.role === "admin";
   action.hidden = !isAdmin;
   action.textContent = mounted ? "Eject SD card" : "Mount SD card";
@@ -118,6 +198,7 @@ function renderStorage(storage) {
     : safeToRemove
       ? "The SD card is unmounted and safe to remove."
       : "The SD card is not mounted. Insert it before choosing Mount SD card.";
+  renderAdminMetrics(arcade.health, storage);
   const photoButton = byId("photo-button");
   if (arcade.profile) {
     photoButton.disabled = !arcade.profile.persistent || !mounted;
@@ -155,14 +236,85 @@ function renderProfile(profile) {
   byId("welcome-text").textContent = `Welcome back ${profile.nickname}`;
 }
 
+function playerWins(player) {
+  return Math.max(0, Number(player?.wins) || 0);
+}
+
+function comparePlayersByScore(a, b) {
+  return playerWins(b) - playerWins(a) ||
+    a.nickname.localeCompare(
+      b.nickname, undefined, { sensitivity: "base" });
+}
+
+function playPendingPlacementCelebrations() {
+  if (!playerListVisible ||
+      document.body.classList.contains("app-fullscreen") ||
+      pendingPlacementCelebrations.size === 0) return;
+  const items = [...byId("player-list").children];
+  for (const [playerId, place] of pendingPlacementCelebrations) {
+    const item = items.find((candidate) =>
+      candidate.dataset.playerId === playerId &&
+      Number(candidate.dataset.place) === place);
+    if (!item) continue;
+    pendingPlacementCelebrations.delete(playerId);
+    item.classList.remove("is-placement-celebrating");
+    requestAnimationFrame(() => {
+      item.classList.add("is-placement-celebrating");
+      setTimeout(
+        () => item.classList.remove("is-placement-celebrating"), 1400);
+    });
+  }
+}
+
+function updatePlayerPlacements(sorted) {
+  const placements = new Map(
+    sorted.slice(0, 3).map((player, index) => [player.id, index + 1]));
+  const wins = new Map(
+    sorted.map((player) => [player.id, playerWins(player)]));
+  const scoreIncreased = sorted.some((player) =>
+    previousPlayerWins.has(player.id) &&
+    playerWins(player) > previousPlayerWins.get(player.id));
+
+  if (playerPlacementsInitialised && scoreIncreased) {
+    for (const [playerId, place] of placements) {
+      if (previousPlayerPlacements.get(playerId) !== place) {
+        pendingPlacementCelebrations.set(playerId, place);
+      }
+    }
+  }
+  previousPlayerPlacements = placements;
+  previousPlayerWins = wins;
+  playerPlacementsInitialised = true;
+  return placements;
+}
+
+function createPlayerRosette(place) {
+  const rosette = document.createElement("span");
+  rosette.className = `player-rosette place-${place}`;
+  rosette.setAttribute("aria-label", `${place === 1 ? "First" :
+    place === 2 ? "Second" : "Third"} place`);
+  rosette.title = rosette.getAttribute("aria-label");
+  const rank = document.createElement("span");
+  rank.className = "player-rosette-rank";
+  rank.textContent = String(place);
+  rosette.append(rank);
+  return rosette;
+}
+
 function renderPlayers(players) {
   const list = byId("player-list");
   list.replaceChildren();
-  const sorted = [...players].sort((a, b) =>
-    a.nickname.localeCompare(b.nickname, undefined, { sensitivity: "base" }));
+  const sorted = [...players].sort(comparePlayersByScore);
+  const placements = updatePlayerPlacements(sorted);
   for (const player of sorted) {
+    const place = placements.get(player.id);
     const item = document.createElement("li");
     item.className = "player";
+    item.dataset.playerId = player.id;
+    if (place) {
+      item.dataset.place = String(place);
+      item.append(createPlayerRosette(place));
+    }
     const avatar = document.createElement("span");
     avatar.className = "avatar";
     avatar.setAttribute("aria-hidden", "true");
@@ -173,22 +325,95 @@ function renderPlayers(players) {
     const wins = document.createElement("span");
     wins.className = "win-roundel";
     renderWinRoundel(wins, player.wins);
-    item.append(avatar, name, wins);
+    const identity = document.createElement("span");
+    identity.className = "player-identity";
+    identity.append(name, wins);
     if (player.id === arcade.profile?.id) {
       const you = document.createElement("span");
       you.className = "you-label";
       you.textContent = "YOU";
-      item.append(you);
+      identity.append(you);
+    }
+    item.append(avatar, identity);
+    const openAppDetails = arcade.apps.find((app) =>
+      app.id === player.openAppId);
+    if (openAppDetails) {
+      const appButton = document.createElement("button");
+      appButton.className = "player-app";
+      appButton.type = "button";
+      appButton.setAttribute(
+        "aria-label",
+        `Open ${openAppDetails.name}, currently open by ${player.nickname}`
+      );
+      const icon = document.createElement("img");
+      icon.src = openAppDetails.iconUrl ||
+        `/apps/${encodeURIComponent(openAppDetails.id)}/assets/icon.svg`;
+      icon.alt = "";
+      icon.decoding = "async";
+      icon.addEventListener("error", () => icon.remove(), { once: true });
+      const appName = document.createElement("span");
+      appName.className = "player-app-name";
+      appName.textContent = openAppDetails.name;
+      appButton.append(icon, appName);
+      appButton.addEventListener("click", () => openApp(openAppDetails));
+      item.append(appButton);
     }
     list.append(item);
   }
   byId("player-count").textContent = String(sorted.length);
   byId("empty-players").hidden = sorted.length > 0;
+  playPendingPlacementCelebrations();
+}
+
+function updateChatToggle() {
+  const count = unreadChatIds.size;
+  const unread = byId("chat-unread");
+  unread.hidden = count === 0;
+  unread.textContent = count > 99 ? "99+" : String(count);
+  unread.setAttribute(
+    "aria-label",
+    `${count} unread chat ${count === 1 ? "message" : "messages"}`
+  );
+  byId("chat-toggle").setAttribute(
+    "aria-expanded", String(!chatCollapsed));
+  byId("chat-toggle-label").textContent =
+    chatCollapsed ? "Expand" : "Collapse";
+}
+
+function setChatCollapsed(collapsed) {
+  chatCollapsed = Boolean(collapsed);
+  byId("chat-card").classList.toggle("is-collapsed", chatCollapsed);
+  byId("chat-body").hidden = chatCollapsed;
+  if (!chatCollapsed) {
+    seenChatIds = new Set(
+      arcade.chatMessages.map((message) => message.id).filter(Boolean));
+    unreadChatIds.clear();
+  }
+  updateChatToggle();
 }
 
 function renderChat(messages) {
   const list = byId("chat-messages");
   const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  const currentIds = new Set(
+    messages.map((message) => message.id).filter(Boolean));
+  if (!chatInitialised) {
+    chatInitialised = true;
+    seenChatIds = currentIds;
+    unreadChatIds.clear();
+  } else if (chatCollapsed) {
+    unreadChatIds = new Set(
+      [...unreadChatIds].filter((id) => currentIds.has(id)));
+    for (const message of messages) {
+      if (message.id && !seenChatIds.has(message.id) &&
+          message.playerId !== arcade.profile?.id) {
+        unreadChatIds.add(message.id);
+      }
+    }
+  } else {
+    seenChatIds = currentIds;
+    unreadChatIds.clear();
+  }
   list.replaceChildren();
   for (const message of messages.slice(-50)) {
     const item = document.createElement("li");
@@ -206,6 +431,7 @@ function renderChat(messages) {
   }
   byId("empty-chat").hidden = messages.length > 0;
   if (nearBottom || messages.length <= 1) list.scrollTop = list.scrollHeight;
+  updateChatToggle();
 }
 
 function setAppFullscreen(session, enabled) {
@@ -227,6 +453,7 @@ function setAppFullscreen(session, enabled) {
         console.error("Game fullscreen callback failed.", error);
       }
     }
+    if (!fullscreen) requestAnimationFrame(playPendingPlacementCelebrations);
   } finally {
     session.changingFullscreen = false;
   }
@@ -247,9 +474,10 @@ function appDisplayCapability(session) {
   });
 }
 
-function closeApp() {
+function closeApp(clearPresence = true) {
   const session = activeAppSession;
   if (session) setAppFullscreen(session, false);
+  if (session && clearPresence) arcade.setOpenApp(null);
   activeAppSession = null;
   document.body.classList.remove("app-fullscreen");
   byId("active-app-panel").classList.remove("is-fullscreen");
@@ -279,13 +507,23 @@ function loadScript(url) {
       loadedAppScripts.add(url);
       resolve();
     };
-    script.onerror = () => reject(new Error("The game could not be read from the SD card."));
+    script.onerror = () => reject(new Error("The game could not be loaded."));
     document.head.append(script);
   });
 }
 
+function scrollToFullGameView(session) {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (activeAppSession !== session || session.fullscreen) return;
+    byId("active-app-panel").scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }));
+}
+
 async function openApp(app) {
-  closeApp();
+  closeApp(false);
   const session = {
     appId: app.id,
     fullscreen: false,
@@ -293,11 +531,11 @@ async function openApp(app) {
     fullscreenListeners: new Set(),
   };
   activeAppSession = session;
+  arcade.setOpenApp(app.id);
   const panel = byId("active-app-panel");
   panel.hidden = false;
   byId("active-app-title").textContent = app.name;
-  byId("app-error").textContent = "Loading from SD card…";
-  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  byId("app-error").textContent = "Loading game…";
   try {
     if (app.stylesheetUrl) {
       const style = document.createElement("link");
@@ -310,7 +548,7 @@ async function openApp(app) {
     if (activeAppSession !== session) return;
     const module = window.PocketArcadeApps?.[app.id];
     if (!module || typeof module.mount !== "function") {
-      throw new Error("This SD application has an invalid entrypoint.");
+      throw new Error("This application has an invalid entrypoint.");
     }
     byId("app-error").textContent = "";
     const appFacade = arcade.createAppFacade(
@@ -318,6 +556,7 @@ async function openApp(app) {
     const cleanup = module.mount(byId("active-app-host"), appFacade);
     if (activeAppSession === session) {
       unmountActiveApp = typeof cleanup === "function" ? cleanup : null;
+      scrollToFullGameView(session);
     } else if (typeof cleanup === "function") {
       cleanup();
     }
@@ -325,7 +564,24 @@ async function openApp(app) {
     if (activeAppSession !== session) return;
     setAppFullscreen(session, false);
     activeAppSession = null;
+    arcade.setOpenApp(null);
     byId("app-error").textContent = error.message;
+    panel.scrollIntoView({ behavior: "smooth", block: "end" });
+  }
+}
+
+function setAppListView(view, persist = true) {
+  appListView = view === "grid" ? "grid" : "list";
+  byId("app-list").classList.toggle("is-grid", appListView === "grid");
+  byId("app-view-list").setAttribute(
+    "aria-pressed", String(appListView === "list"));
+  byId("app-view-grid").setAttribute(
+    "aria-pressed", String(appListView === "grid"));
+  if (!persist) return;
+  try {
+    localStorage.setItem(appViewStorageKey, appListView);
+  } catch {
+    /* The selected view still applies for this page session. */
   }
 }
 
@@ -335,20 +591,34 @@ function renderApps(apps) {
   for (const app of apps) {
     const card = document.createElement("article");
     card.className = "app-card";
-    const title = document.createElement("h3");
+    const launch = document.createElement("button");
+    launch.className = "app-launch";
+    launch.type = "button";
+    launch.setAttribute(
+      "aria-label",
+      `Open ${app.name}${app.description ? `: ${app.description}` : ""}`);
+    const iconFrame = document.createElement("span");
+    iconFrame.className = "app-card-icon";
+    const icon = document.createElement("img");
+    icon.src = app.iconUrl ||
+      `/apps/${encodeURIComponent(app.id)}/assets/icon.svg`;
+    icon.alt = "";
+    icon.decoding = "async";
+    icon.addEventListener("error", () => iconFrame.classList.add("is-empty"), {
+      once: true,
+    });
+    iconFrame.append(icon);
+    const title = document.createElement("span");
+    title.className = "app-card-title";
     title.textContent = app.name;
-    const description = document.createElement("p");
-    description.textContent = app.description || "PocketArcade application";
-    const open = document.createElement("button");
-    open.className = "primary";
-    open.type = "button";
-    open.textContent = "Open";
-    open.addEventListener("click", () => openApp(app));
-    card.append(title, description, open);
+    launch.append(iconFrame, title);
+    launch.addEventListener("click", () => openApp(app));
+    card.append(launch);
     list.append(card);
   }
   byId("empty-apps").hidden = apps.length > 0;
   if (!apps.length) closeApp();
+  renderPlayers([...arcade.players.values()]);
 }
 
 function showLobby() {
@@ -381,6 +651,10 @@ arcade.on("chat.error", (error) => {
 arcade.on("apps.changed", renderApps);
 arcade.on("profile.required", () => {
   closeApp();
+  chatInitialised = false;
+  seenChatIds.clear();
+  unreadChatIds.clear();
+  updateChatToggle();
   byId("nickname").value = "";
   byId("nickname-error").textContent = "";
   showView("setup-view");
@@ -444,6 +718,23 @@ byId("chat-form").addEventListener("submit", (event) => {
   input.focus();
 });
 
+byId("chat-toggle").addEventListener("click", () => {
+  setChatCollapsed(!chatCollapsed);
+  if (!chatCollapsed) byId("chat-input").focus();
+});
+
+byId("app-view-list").addEventListener(
+  "click", () => setAppListView("list"));
+byId("app-view-grid").addEventListener(
+  "click", () => setAppListView("grid"));
+
+document.addEventListener("pointerdown", (event) => {
+  const account = byId("account-pill");
+  if (account.open && !account.contains(event.target)) {
+    account.open = false;
+  }
+});
+
 byId("storage-action").addEventListener("click", async () => {
   const button = byId("storage-action");
   const ejecting = button.dataset.mode === "eject";
@@ -457,11 +748,35 @@ byId("storage-action").addEventListener("click", async () => {
   }
 });
 
+function stopAdminStats() {
+  if (adminStatsTimer !== null) clearTimeout(adminStatsTimer);
+  adminStatsTimer = null;
+}
+
+async function refreshAdminStats() {
+  if (adminStatsRefreshing || !byId("admin-dialog").open) return;
+  adminStatsRefreshing = true;
+  try {
+    const { health, storage } = await arcade.refreshDeviceStats();
+    renderAdminMetrics(health, storage);
+  } catch (error) {
+    console.warn("Could not refresh administrator metrics.", error);
+  } finally {
+    adminStatsRefreshing = false;
+    if (byId("admin-dialog").open) {
+      adminStatsTimer = setTimeout(refreshAdminStats, 2000);
+    }
+  }
+}
+
 byId("admin-button").addEventListener("click", () => {
   byId("account-pill").open = false;
   renderStorage(arcade.storage);
   byId("admin-dialog").showModal();
+  stopAdminStats();
+  void refreshAdminStats();
 });
+byId("admin-dialog").addEventListener("close", stopAdminStats);
 
 function canvasJpeg(canvas, quality) {
   return new Promise((resolve, reject) => {
@@ -636,4 +951,19 @@ document.addEventListener("keydown", (event) => {
 });
 byId("retry-button").addEventListener("click", start);
 
+if ("IntersectionObserver" in window) {
+  const playerListObserver = new IntersectionObserver(
+    (entries) => {
+      playerListVisible = entries.some(
+        (entry) => entry.isIntersecting && entry.intersectionRatio >= .25);
+      if (playerListVisible) playPendingPlacementCelebrations();
+    },
+    { threshold: [.25] }
+  );
+  playerListObserver.observe(byId("player-list"));
+} else {
+  playerListVisible = true;
+}
+
+setAppListView(appListView, false);
 start();

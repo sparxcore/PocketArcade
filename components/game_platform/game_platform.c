@@ -1010,15 +1010,6 @@ static bool queue_work(game_work_t *work)
     return false;
 }
 
-static void discard_queued_work(void)
-{
-    game_work_t *work = NULL;
-    while (xQueueReceive(work_queue, &work, 0) == pdTRUE) {
-        release_work(work);
-        work = NULL;
-    }
-}
-
 static void send_error_to_members(const char *match_id,
                                   game_platform_result_t result)
 {
@@ -2014,14 +2005,16 @@ void game_platform_storage_unavailable(void)
     size_t count = 0;
     xSemaphoreTake(platform_lock, portMAX_DELAY);
     for (size_t i = 0; i < CONFIG_PA_GAME_MAX_MATCHES; ++i) {
-        if (!matches[i].used) continue;
+        if (!matches[i].used ||
+            matches[i].application.source != APP_SOURCE_SD) {
+            continue;
+        }
         matches[i].state = MATCH_FINISHED;
         ++matches[i].revision;
         strlcpy(ids[count++], matches[i].id, sizeof(ids[0]));
     }
     xSemaphoreGive(platform_lock);
     for (size_t i = 0; i < count; ++i) send_match_to_members(ids[i]);
-    discard_queued_work();
     for (size_t i = 0; i < count; ++i) {
         game_work_t *work = acquire_work(WORK_UNLOAD);
         if (work) {

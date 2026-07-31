@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include "driver/gpio.h"
@@ -568,9 +567,12 @@ void storage_get_info(storage_info_t *info)
     }
     xSemaphoreGive(state_lock);
     if (info->mounted) {
-        struct statvfs fs;
-        if (statvfs(PA_SD_MOUNT_POINT, &fs) == 0) {
-            info->free_bytes = (uint64_t)fs.f_bavail * fs.f_frsize;
+        uint64_t filesystem_bytes = 0;
+        uint64_t free_bytes = 0;
+        if (esp_vfs_fat_info(PA_SD_MOUNT_POINT, &filesystem_bytes,
+                             &free_bytes) == ESP_OK) {
+            info->capacity_bytes = filesystem_bytes;
+            info->free_bytes = free_bytes;
         }
     }
     storage_filesystem_unlock();

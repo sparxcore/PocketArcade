@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+#include "builtin_apps.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -143,8 +144,12 @@ static bool json_app_path(cJSON *root, const char *relative_key,
     return true;
 }
 
-static bool app_file_exists(const char *directory_name, const char *relative)
+static bool app_file_exists(app_source_t source, const char *directory_name,
+                            const char *relative)
 {
+    if (source == APP_SOURCE_BUILTIN) {
+        return pa_builtin_app_file_find(directory_name, relative) != NULL;
+    }
     char path[256];
     snprintf(path, sizeof(path), "%s/apps/%s/%s",
              PA_SD_MOUNT_POINT, directory_name, relative);
@@ -182,9 +187,16 @@ static bool json_integer(cJSON *root, const char *key, int *output)
     return true;
 }
 
-static bool runtime_script_valid(const char *directory_name,
+static bool runtime_script_valid(app_source_t source,
+                                 const char *directory_name,
                                  const char *relative)
 {
+    if (source == APP_SOURCE_BUILTIN) {
+        const pa_builtin_app_file_t *file =
+            pa_builtin_app_file_find(directory_name, relative);
+        return file && !file->encoding && file->length > 0 &&
+               file->length <= CONFIG_PA_GAME_MAX_SCRIPT_BYTES;
+    }
     char path[256];
     snprintf(path, sizeof(path), "%s/apps/%s/%s",
              PA_SD_MOUNT_POINT, directory_name, relative);
@@ -217,6 +229,7 @@ static bool parse_capabilities(cJSON *root, uint32_t *capabilities)
 }
 
 static manifest_result_t load_manifest(const char *directory_name,
+                                       app_source_t source,
                                        app_descriptor_t *app)
 {
     char normalised_id[49];
@@ -225,29 +238,49 @@ static manifest_result_t load_manifest(const char *directory_name,
     }
     char bounded_directory[49];
     strlcpy(bounded_directory, directory_name, sizeof(bounded_directory));
-    char path[256];
-    snprintf(path, sizeof(path), "%s/apps/%s/manifest.json",
-             PA_SD_MOUNT_POINT, bounded_directory);
-    FILE *file = fopen(path, "rb");
-    if (!file) return errno == ENOENT ? MANIFEST_NOT_FOUND
-                                     : MANIFEST_IO_ERROR;
-    if (fseek(file, 0, SEEK_END) != 0) {
-        fclose(file);
-        return MANIFEST_IO_ERROR;
+    app->source = source;
+
+    const pa_builtin_app_file_t *builtin_manifest = NULL;
+    FILE *file = NULL;
+    long length = -1;
+    if (source == APP_SOURCE_BUILTIN) {
+        builtin_manifest =
+            pa_builtin_app_file_find(bounded_directory, "manifest.json");
+        if (!builtin_manifest || builtin_manifest->encoding) {
+            return MANIFEST_NOT_FOUND;
+        }
+        length = (long)builtin_manifest->length;
+    } else {
+        char path[256];
+        snprintf(path, sizeof(path), "%s/apps/%s/manifest.json",
+                 PA_SD_MOUNT_POINT, bounded_directory);
+        file = fopen(path, "rb");
+        if (!file) return errno == ENOENT ? MANIFEST_NOT_FOUND
+                                         : MANIFEST_IO_ERROR;
+        if (fseek(file, 0, SEEK_END) != 0) {
+            fclose(file);
+            return MANIFEST_IO_ERROR;
+        }
+        length = ftell(file);
+        rewind(file);
     }
-    long length = ftell(file);
-    rewind(file);
     if (length <= 0 || length > MAX_MANIFEST_BYTES) {
-        fclose(file);
+        if (file) fclose(file);
         return MANIFEST_TOO_LARGE;
     }
     char *buffer = malloc((size_t)length + 1);
     if (!buffer) {
-        fclose(file);
+        if (file) fclose(file);
         return MANIFEST_IO_ERROR;
     }
-    bool read_ok = fread(buffer, 1, (size_t)length, file) == (size_t)length;
-    fclose(file);
+    bool read_ok = true;
+    if (builtin_manifest) {
+        memcpy(buffer, builtin_manifest->data, (size_t)length);
+    } else {
+        read_ok =
+            fread(buffer, 1, (size_t)length, file) == (size_t)length;
+        fclose(file);
+    }
     buffer[length] = '\0';
     cJSON *root = read_ok ? cJSON_ParseWithLength(buffer, (size_t)length) : NULL;
     free(buffer);
@@ -287,14 +320,14 @@ static manifest_result_t load_manifest(const char *directory_name,
                        app->manifest_version == 1 ? "entrypointUrl" : NULL,
                        app->id, app->entrypoint,
                        sizeof(app->entrypoint), true) ||
-        !app_file_exists(bounded_directory, app->entrypoint)) {
+        !app_file_exists(source, bounded_directory, app->entrypoint)) {
         /*
          * Compatibility for the v0.1 development package that briefly used
          * a different entrypoint field. The fixed fallback is accepted only
          * when the file exists inside this already-validated app directory.
          */
         if (app->manifest_version == 1 &&
-            app_file_exists(bounded_directory, "app.js")) {
+            app_file_exists(source, bounded_directory, "app.js")) {
             strlcpy(app->entrypoint, "app.js", sizeof(app->entrypoint));
             ESP_LOGW(TAG, "App %.48s uses legacy entrypoint metadata",
                      normalised_id);
@@ -313,7 +346,7 @@ static manifest_result_t load_manifest(const char *directory_name,
                        app->id,
                        app->stylesheet, sizeof(app->stylesheet), false) ||
         (app->stylesheet[0] &&
-         !app_file_exists(bounded_directory, app->stylesheet))) {
+         !app_file_exists(source, bounded_directory, app->stylesheet))) {
         app->stylesheet[0] = '\0';
     }
     if (!json_string(root, "kind", app->kind, sizeof(app->kind), false)) {
@@ -353,11 +386,11 @@ static manifest_result_t load_manifest(const char *directory_name,
             !json_app_path(runtime, "entrypoint", NULL, app->id,
                            app->runtime_entrypoint,
                            sizeof(app->runtime_entrypoint), true) ||
-            !runtime_script_valid(bounded_directory,
+            !runtime_script_valid(source, bounded_directory,
                                   app->runtime_entrypoint) ||
             !json_string(runtime, "mode", mode, sizeof(mode), true)) {
             cJSON_Delete(root);
-            return runtime_script_valid(bounded_directory,
+            return runtime_script_valid(source, bounded_directory,
                                         app->runtime_entrypoint)
                        ? MANIFEST_INVALID_RUNTIME
                        : MANIFEST_SCRIPT_TOO_LARGE;
@@ -441,6 +474,15 @@ static manifest_result_t load_manifest(const char *directory_name,
     return MANIFEST_OK;
 }
 
+static bool descriptor_id_exists(const app_descriptor_t *descriptors,
+                                 size_t count, const char *id)
+{
+    for (size_t i = 0; i < count; ++i) {
+        if (strcmp(descriptors[i].id, id) == 0) return true;
+    }
+    return false;
+}
+
 static void scan_catalogue(void)
 {
     app_descriptor_t *found = calloc(MAX_APPS, sizeof(*found));
@@ -449,6 +491,20 @@ static void scan_catalogue(void)
         return;
     }
     size_t found_count = 0;
+    for (size_t i = 0;
+         i < pa_builtin_app_count() && found_count < MAX_APPS; ++i) {
+        const char *id = pa_builtin_app_id(i);
+        app_descriptor_t candidate = {0};
+        manifest_result_t result =
+            load_manifest(id, APP_SOURCE_BUILTIN, &candidate);
+        if (result == MANIFEST_OK) {
+            found[found_count++] = candidate;
+        } else {
+            ESP_LOGE(TAG, "Ignored built-in app %.48s: %s", id,
+                     manifest_result_name(result));
+        }
+    }
+
     storage_filesystem_lock();
     if (storage_is_mounted()) {
         DIR *directory = opendir(PA_SD_MOUNT_POINT "/apps");
@@ -457,10 +513,16 @@ static void scan_catalogue(void)
             while (found_count < MAX_APPS &&
                    (entry = readdir(directory)) != NULL) {
                 if (entry->d_name[0] == '.') continue;
+                app_descriptor_t candidate = {0};
                 manifest_result_t result =
-                    load_manifest(entry->d_name, &found[found_count]);
-                if (result == MANIFEST_OK) {
-                    ++found_count;
+                    load_manifest(entry->d_name, APP_SOURCE_SD, &candidate);
+                if (result == MANIFEST_OK &&
+                    !descriptor_id_exists(found, found_count, candidate.id)) {
+                    found[found_count++] = candidate;
+                } else if (result == MANIFEST_OK) {
+                    ESP_LOGW(TAG,
+                             "Ignored SD app %.48s: built-in app takes precedence",
+                             entry->d_name);
                 } else {
                     ESP_LOGW(TAG, "Ignored app entry %.48s: %s",
                              entry->d_name, manifest_result_name(result));
@@ -512,6 +574,8 @@ cJSON *app_catalogue_response(void)
         cJSON_AddStringToObject(json, "description", app->description);
         cJSON_AddStringToObject(json, "kind",
                                 app->kind[0] ? app->kind : "application");
+        cJSON_AddBoolToObject(json, "builtIn",
+                              app->source == APP_SOURCE_BUILTIN);
         cJSON_AddNumberToObject(json, "manifestVersion",
                                 app->manifest_version);
         cJSON_AddStringToObject(json, "version", app->version);
@@ -525,6 +589,8 @@ cJSON *app_catalogue_response(void)
         } else {
             cJSON_AddNullToObject(json, "stylesheetUrl");
         }
+        snprintf(url, sizeof(url), "/apps/%s/assets/icon.svg", app->id);
+        cJSON_AddStringToObject(json, "iconUrl", url);
         if (app->manifest_version == 2) {
             cJSON *runtime = cJSON_AddObjectToObject(json, "runtime");
             cJSON_AddStringToObject(runtime, "type", app->runtime_type);
@@ -598,20 +664,6 @@ void app_catalogue_invalidate(void)
     scan_catalogue();
 }
 
-static bool cached_app_exists(const char *id)
-{
-    bool found = false;
-    xSemaphoreTake(apps_lock, portMAX_DELAY);
-    for (size_t i = 0; i < app_count; ++i) {
-        if (strcmp(apps[i].id, id) == 0) {
-            found = true;
-            break;
-        }
-    }
-    xSemaphoreGive(apps_lock);
-    return found;
-}
-
 static const char *mime_for_path(const char *path)
 {
     const char *extension = strrchr(path, '.');
@@ -628,6 +680,29 @@ static const char *mime_for_path(const char *path)
     if (strcmp(extension, ".mp3") == 0) return "audio/mpeg";
     if (strcmp(extension, ".ogg") == 0) return "audio/ogg";
     return "application/octet-stream";
+}
+
+static esp_err_t serve_builtin_asset(
+    httpd_req_t *request, const pa_builtin_app_file_t *file)
+{
+    if (!file) return httpd_resp_send_404(request);
+    httpd_resp_set_type(request, file->mime);
+    if (file->encoding) {
+        httpd_resp_set_hdr(request, "Content-Encoding", file->encoding);
+        httpd_resp_set_hdr(request, "Vary", "Accept-Encoding");
+    }
+    httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
+    httpd_resp_set_hdr(request, "Connection", "close");
+    httpd_resp_set_hdr(request, "Cache-Control", "no-cache");
+    const size_t chunk_size = 1024;
+    for (size_t offset = 0; offset < file->length; offset += chunk_size) {
+        size_t remaining = file->length - offset;
+        size_t length = remaining < chunk_size ? remaining : chunk_size;
+        esp_err_t result = httpd_resp_send_chunk(
+            request, (const char *)file->data + offset, length);
+        if (result != ESP_OK) return result;
+    }
+    return httpd_resp_send_chunk(request, NULL, 0);
 }
 
 static esp_err_t serve_app_asset(httpd_req_t *request)
@@ -648,9 +723,17 @@ static esp_err_t serve_app_asset(httpd_req_t *request)
     char relative[97];
     memcpy(relative, relative_start, relative_length);
     relative[relative_length] = '\0';
+    app_descriptor_t application;
     if (!storage_valid_app_id(app_id) ||
         !storage_safe_relative_path(relative) ||
-        !cached_app_exists(app_id)) return httpd_resp_send_404(request);
+        !app_catalogue_get(app_id, &application)) {
+        return httpd_resp_send_404(request);
+    }
+
+    if (application.source == APP_SOURCE_BUILTIN) {
+        return serve_builtin_asset(
+            request, pa_builtin_app_file_find(app_id, relative));
+    }
 
     storage_filesystem_lock();
     if (!storage_is_mounted()) {

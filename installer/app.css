@@ -24,7 +24,8 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(circle at 20% 0%, rgba(116, 74, 202, 0.28), transparent 34rem),
+    radial-gradient(circle at 16% 0%, rgba(226, 43, 225, 0.22), transparent 31rem),
+    radial-gradient(circle at 84% 2%, rgba(39, 158, 255, 0.18), transparent 30rem),
     linear-gradient(180deg, #0d0819, #090612 60%);
 }
 
@@ -41,6 +42,14 @@ main {
 .hero {
   max-width: 52rem;
   margin-bottom: 3rem;
+}
+
+.hero-logo {
+  display: block;
+  width: min(100%, 40rem);
+  height: auto;
+  margin: 0 0 clamp(1.5rem, 5vw, 2.5rem);
+  filter: drop-shadow(0 1rem 2.5rem rgba(103, 58, 255, 0.28));
 }
 
 .eyebrow {
@@ -130,6 +139,12 @@ li {
   border: 1px solid var(--line);
   border-radius: 1rem;
   background: var(--panel);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.board-card:hover {
+  border-color: rgba(151, 121, 255, 0.44);
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.22);
 }
 
 .status {
@@ -178,6 +193,17 @@ dd {
 .notes {
   margin: 1.25rem 0;
   font-size: 0.92rem;
+}
+
+.profile-caution {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 216, 77, 0.24);
+  border-radius: 0.65rem;
+  color: #f7e7a2;
+  background: rgba(255, 216, 77, 0.07);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 esp-web-install-button {
@@ -234,5 +260,9 @@ footer p {
   *::before,
   *::after {
     scroll-behavior: auto !important;
+  }
+
+  .board-card {
+    transition: none;
   }
 }

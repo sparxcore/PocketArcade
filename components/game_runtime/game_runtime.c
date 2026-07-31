@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "builtin_apps.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_random.h"
@@ -723,8 +724,11 @@ static int open_sandbox_entry(lua_State *state)
 
 typedef struct {
     FILE *file;
+    const unsigned char *data;
+    size_t offset;
     size_t remaining;
     bool read_failed;
+    bool storage_locked;
     char buffer[512];
 } script_reader_t;
 
@@ -733,13 +737,24 @@ static const char *read_script_chunk(lua_State *state, void *data,
 {
     (void)state;
     script_reader_t *reader = data;
-    if (!reader || !reader->file || reader->read_failed ||
-        reader->remaining == 0) {
+    if (!reader || reader->read_failed || reader->remaining == 0) {
         *size = 0;
         return NULL;
     }
     size_t requested = reader->remaining < sizeof(reader->buffer)
                            ? reader->remaining : sizeof(reader->buffer);
+    if (reader->data) {
+        const char *chunk = (const char *)reader->data + reader->offset;
+        reader->offset += requested;
+        reader->remaining -= requested;
+        *size = requested;
+        return chunk;
+    }
+    if (!reader->file) {
+        reader->read_failed = true;
+        *size = 0;
+        return NULL;
+    }
     size_t count = fread(reader->buffer, 1, requested, reader->file);
     if (count != requested) reader->read_failed = true;
     reader->remaining -= count;
@@ -754,8 +769,23 @@ static const char *read_script_chunk(lua_State *state, void *data,
  * at the same time.
  */
 static esp_err_t open_script(const app_descriptor_t *application,
-                             FILE **script, size_t *script_length)
+                             script_reader_t *reader)
 {
+    if (!application || !reader) return ESP_ERR_INVALID_ARG;
+    memset(reader, 0, sizeof(*reader));
+    if (application->source == APP_SOURCE_BUILTIN) {
+        const pa_builtin_app_file_t *file = pa_builtin_app_file_find(
+            application->id, application->runtime_entrypoint);
+        if (!file) return ESP_ERR_NOT_FOUND;
+        if (file->encoding || file->length == 0 ||
+            file->length > CONFIG_PA_GAME_MAX_SCRIPT_BYTES) {
+            return ESP_ERR_INVALID_SIZE;
+        }
+        reader->data = file->data;
+        reader->remaining = file->length;
+        return ESP_OK;
+    }
+
     char path[256];
     snprintf(path, sizeof(path), "%s/apps/%s/%s", PA_SD_MOUNT_POINT,
              application->id, application->runtime_entrypoint);
@@ -773,15 +803,19 @@ static esp_err_t open_script(const app_descriptor_t *application,
         storage_filesystem_unlock();
         return ESP_ERR_INVALID_SIZE;
     }
-    *script = file;
-    *script_length = (size_t)length;
+    reader->file = file;
+    reader->remaining = (size_t)length;
+    reader->storage_locked = true;
     return ESP_OK;
 }
 
-static void close_script(FILE *script)
+static void close_script(script_reader_t *reader)
 {
-    if (script) fclose(script);
-    storage_filesystem_unlock();
+    if (!reader) return;
+    if (reader->file) fclose(reader->file);
+    if (reader->storage_locked) storage_filesystem_unlock();
+    reader->file = NULL;
+    reader->storage_locked = false;
 }
 
 static int setup_runtime_entry(lua_State *state)
@@ -877,9 +911,8 @@ esp_err_t game_runtime_load(game_runtime_t *runtime,
     runtime->context_ref = LUA_NOREF;
     runtime->host = *host;
 
-    FILE *script = NULL;
-    size_t script_length = 0;
-    esp_err_t result = open_script(application, &script, &script_length);
+    script_reader_t reader;
+    esp_err_t result = open_script(application, &reader);
     if (result != ESP_OK) {
         runtime_fault(runtime, "server script could not be read");
         return result;
@@ -887,7 +920,7 @@ esp_err_t game_runtime_load(game_runtime_t *runtime,
     lua_State *state = lua_newstate(quota_allocator, runtime);
     runtime->lua_state = state;
     if (!state) {
-        close_script(script);
+        close_script(&reader);
         runtime_fault(runtime, "runtime memory quota is too small");
         return ESP_ERR_NO_MEM;
     }
@@ -895,17 +928,13 @@ esp_err_t game_runtime_load(game_runtime_t *runtime,
     lua_atpanic(state, panic_handler);
     lua_pushcfunction(state, open_sandbox_entry);
     if (protected_call(runtime, 0, 0, "sandbox") != LUA_OK) {
-        close_script(script);
+        close_script(&reader);
         return ESP_FAIL;
     }
 
-    script_reader_t reader = {
-        .file = script,
-        .remaining = script_length,
-    };
     int load_status = lua_load(state, read_script_chunk, &reader,
                                application->runtime_entrypoint, "t");
-    close_script(script);
+    close_script(&reader);
     if (reader.read_failed || reader.remaining != 0) {
         runtime_fault(runtime, "server script could not be read");
         return ESP_FAIL;

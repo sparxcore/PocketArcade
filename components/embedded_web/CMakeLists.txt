@@ -9,6 +9,7 @@ set(WEB_ASSET_SOURCES
     "${PROJECT_DIR}/web/js/pocket-arcade.js"
     "${PROJECT_DIR}/web/js/app.js"
     "${PROJECT_DIR}/web/assets/icon.svg"
+    "${PROJECT_DIR}/web/assets/logo-horizontal.webp"
     "${PROJECT_DIR}/web/assets/portal-horizontal.jpg"
     "${PROJECT_DIR}/web/assets/portal-vertical.jpg"
 )

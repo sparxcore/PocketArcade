@@ -38,9 +38,12 @@ jobs:
           if [ -n "${INSTALLER_VERSION}" ]; then
             python3 tools/board_profiles.py package \
               --output dist/pages \
-              --version "${INSTALLER_VERSION}"
+              --version "${INSTALLER_VERSION}" \
+              --include-provisional
           else
-            python3 tools/board_profiles.py package --output dist/pages
+            python3 tools/board_profiles.py package \
+              --output dist/pages \
+              --include-provisional
           fi
 
       - name: Configure GitHub Pages

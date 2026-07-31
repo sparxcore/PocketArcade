@@ -12,6 +12,10 @@ CONFIG_SPIRAM_SPEED_40M=y
 # CONFIG_SPIRAM_IGNORE_NOTFOUND is not set
 CONFIG_SPIRAM_USE_CAPS_ALLOC=y
 
+# Sample idle time so the administrator view can report current CPU load.
+CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
+CONFIG_FREERTOS_RUN_TIME_COUNTER_TYPE_U32=y
+
 # PocketArcade is intentionally open by default for quick local joining.
 CONFIG_PA_AP_PASSWORD=""
 CONFIG_PA_HTTP_MAX_URI_HANDLERS=36

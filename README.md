@@ -300,7 +300,7 @@ components. The manual hardware acceptance sequence is in
 ## Documentation
 
 - [Architecture and concurrency](docs/architecture.md)
-- [Game development and deployment guide](docs/game-development-guide.md)
+- [Game development and deployment guide](docs/PocketArcade-game-development-guide.md)
 - [HTTP API](docs/http-api.md)
 - [WebSocket protocol](docs/websocket-protocol.md)
 - [Profile lifecycle and device recognition](docs/profiles-and-identity.md)

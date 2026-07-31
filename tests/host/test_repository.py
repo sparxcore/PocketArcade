@@ -141,6 +141,129 @@ class RepositoryTests(unittest.TestCase):
         self.assertNotIn("innerHTML", scripts)
         self.assertIn("textContent", scripts)
 
+    def test_admin_dialog_reports_live_device_metrics(self):
+        health_source = (
+            ROOT / "components/http_api/http_api.c"
+        ).read_text(encoding="utf-8")
+        system_state = (
+            ROOT / "components/system_state/system_state.c"
+        ).read_text(encoding="utf-8")
+        page = (ROOT / "web/index.html").read_text(encoding="utf-8")
+        app = (ROOT / "web/js/app.js").read_text(encoding="utf-8")
+        client = (
+            ROOT / "web/js/pocket-arcade.js"
+        ).read_text(encoding="utf-8")
+
+        for field in (
+            "cpuUsagePercent",
+            "cpuSampleReady",
+            "ramTotalBytes",
+            "ramFreeBytes",
+        ):
+            self.assertIn(f'"{field}"', health_source)
+        self.assertIn("ulTaskGetIdleRunTimeCounterForCore", system_state)
+        self.assertIn("heap_caps_get_total_size", system_state)
+        for gauge in ("cpu-gauge", "ram-gauge", "sd-gauge"):
+            self.assertIn(f'id="{gauge}"', page)
+        self.assertIn("refreshDeviceStats", client)
+        self.assertIn("setTimeout(refreshAdminStats, 2000)", app)
+
+    def test_storage_stats_use_supported_fatfs_capacity_api(self):
+        storage = (
+            ROOT / "components/storage/storage.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("esp_vfs_fat_info(", storage)
+        self.assertNotIn("statvfs(", storage)
+        self.assertIn("info->capacity_bytes = filesystem_bytes", storage)
+        self.assertIn("info->free_bytes = free_bytes", storage)
+
+    def test_players_are_score_ranked_with_compact_podium_fixtures(self):
+        app = (ROOT / "web/js/app.js").read_text(encoding="utf-8")
+        css = (ROOT / "web/css/app.css").read_text(encoding="utf-8")
+        self.assertIn("function comparePlayersByScore", app)
+        self.assertIn("playerWins(b) - playerWins(a)", app)
+        self.assertIn("createPlayerRosette(place)", app)
+        self.assertIn("pendingPlacementCelebrations", app)
+        self.assertIn("IntersectionObserver", app)
+        self.assertIn("is-placement-celebrating", app)
+        self.assertIn("flex-wrap: nowrap", css)
+        self.assertIn("width: fit-content", css)
+        self.assertIn("@keyframes player-rosette-shimmer", css)
+        self.assertIn("@keyframes player-gold-glow", css)
+
+    def test_opening_game_scrolls_after_mount_to_show_its_bottom(self):
+        app = (ROOT / "web/js/app.js").read_text(encoding="utf-8")
+        mount = app.index('module.mount(byId("active-app-host"), appFacade)')
+        scroll = app.index("scrollToFullGameView(session)", mount)
+        self.assertGreater(scroll, mount)
+        self.assertIn('block: "end"', app)
+
+    def test_chat_starts_collapsed_and_apps_offer_list_and_tile_views(self):
+        page = (ROOT / "web/index.html").read_text(encoding="utf-8")
+        app = (ROOT / "web/js/app.js").read_text(encoding="utf-8")
+        css = (ROOT / "web/css/app.css").read_text(encoding="utf-8")
+
+        self.assertIn('class="card chat-card is-collapsed"', page)
+        self.assertIn('id="chat-body" hidden', page)
+        self.assertIn('aria-expanded="false"', page)
+        self.assertIn("let chatCollapsed = true", app)
+        self.assertIn('setAppListView("list")', app)
+        self.assertIn('setAppListView("grid")', app)
+        self.assertIn('id="app-view-list"', page)
+        self.assertIn('id="app-view-grid"', page)
+        self.assertIn(".app-list.is-grid", css)
+        self.assertIn(".app-card-icon", css)
+
+    def test_builtin_app_source_is_wired_through_catalogue_and_runtime(self):
+        catalogue_header = (
+            ROOT / "components/app_catalogue/include/app_catalogue.h"
+        ).read_text(encoding="utf-8")
+        catalogue = (
+            ROOT / "components/app_catalogue/app_catalogue.c"
+        ).read_text(encoding="utf-8")
+        runtime = (
+            ROOT / "components/game_runtime/game_runtime.c"
+        ).read_text(encoding="utf-8")
+        platform = (
+            ROOT / "components/game_platform/game_platform.c"
+        ).read_text(encoding="utf-8")
+        builtin_cmake = (
+            ROOT / "components/builtin_apps/CMakeLists.txt"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("APP_SOURCE_BUILTIN", catalogue_header)
+        self.assertIn("pa_builtin_app_count()", catalogue)
+        self.assertIn("serve_builtin_asset", catalogue)
+        self.assertIn("application->source == APP_SOURCE_BUILTIN", runtime)
+        self.assertIn(
+            "matches[i].application.source != APP_SOURCE_SD", platform
+        )
+        self.assertIn("prepare_builtin_apps.py", builtin_cmake)
+        self.assertIn("tic-tac-toe", builtin_cmake)
+
+    def test_open_game_presence_is_clickable_and_connection_scoped(self):
+        app = (ROOT / "web/js/app.js").read_text(encoding="utf-8")
+        client = (
+            ROOT / "web/js/pocket-arcade.js"
+        ).read_text(encoding="utf-8")
+        websocket = (
+            ROOT / "components/websocket/websocket.c"
+        ).read_text(encoding="utf-8")
+
+        selected = app.index("arcade.setOpenApp(app.id)")
+        loading = app.index("await loadScript(app.entrypointUrl)")
+        self.assertLess(selected, loading)
+        self.assertIn("player.openAppId", app)
+        self.assertIn(
+            'appButton.addEventListener("click", () => openApp(openAppDetails))',
+            app,
+        )
+        self.assertIn('this.send("presence.app", { appId })', client)
+        self.assertIn("char open_app_id[PA_APP_ID_MAX + 1]", websocket)
+        self.assertIn("effective_open_app_locked", websocket)
+        self.assertIn("set_connection_open_app(fd, profile.id, app_id)",
+                      websocket)
+
     def test_browser_sends_no_mac_or_fingerprint_identity(self):
         client = (ROOT / "web/js/pocket-arcade.js").read_text(encoding="utf-8")
         self.assertNotRegex(client, r"\b(deviceFingerprint|stationMac|clientMac)\b")
@@ -162,8 +285,14 @@ class RepositoryTests(unittest.TestCase):
         self.assertIn('"chat.send"', protocol)
         self.assertIn('this.send("chat.send"', client)
 
-    def test_tic_tac_toe_is_an_independent_sd_application(self):
-        package = ROOT / "sdcard-example/apps/tic-tac-toe"
+    def test_tic_tac_toe_is_a_firmware_owned_application(self):
+        package = (
+            ROOT
+            / "components"
+            / "builtin_apps"
+            / "apps"
+            / "tic-tac-toe"
+        )
         manifest = json.loads((package / "manifest.json").read_text())
         self.assertEqual(manifest["id"], "tic-tac-toe")
         self.assertEqual(manifest["manifestVersion"], 2)
@@ -181,6 +310,10 @@ class RepositoryTests(unittest.TestCase):
         self.assertIn("arcade.game.send", game_script)
         embedded_routes = (ROOT / "tools/prepare_web.py").read_text()
         self.assertNotIn("tic-tac-toe", embedded_routes)
+        builtin_cmake = (
+            ROOT / "components/builtin_apps/CMakeLists.txt"
+        ).read_text()
+        self.assertIn("TIC_TAC_TOE_APP_DIR", builtin_cmake)
         catalogue = (ROOT / "components/app_catalogue/app_catalogue.c").read_text()
         self.assertIn('PA_SD_MOUNT_POINT "/apps"', catalogue)
         self.assertIn('"/apps/*"', catalogue)
@@ -218,7 +351,8 @@ class RepositoryTests(unittest.TestCase):
         self.assertIn("lua_load(state, read_script_chunk", runtime)
         self.assertIn("char buffer[512]", runtime)
         self.assertNotIn("static esp_err_t read_script(", runtime)
-        self.assertIn("FILE *script = NULL", runtime)
+        self.assertIn("script_reader_t reader", runtime)
+        self.assertIn("const unsigned char *data", runtime)
         self.assertIn('application->runtime_entrypoint, "t"', runtime)
         self.assertIn("lua_sethook(state, instruction_hook", runtime)
         self.assertIn("CONFIG_PA_GAME_LUA_INSTRUCTION_LIMIT", runtime)
@@ -451,7 +585,7 @@ class RepositoryTests(unittest.TestCase):
             ROOT / "components/board_config/Kconfig"
         ).read_text()
         guide = (
-            ROOT / "docs/game-development-guide.md"
+            ROOT / "docs/PocketArcade-game-development-guide.md"
         ).read_text()
 
         self.assertIn("configure_schedule_locked", platform)
@@ -523,7 +657,7 @@ class RepositoryTests(unittest.TestCase):
         ).read_text()
         self.assertIn("on_tick = function(context, delta_ms)", server)
         self.assertIn("match.finish(", server)
-        self.assertIn("transport.broadcast_snapshot(snapshot(context))", server)
+        self.assertIn("transport.broadcast_snapshot(snapshot(context", server)
         self.assertNotIn("storage.write(", server)
         self.assertIn("arcade.game.send", browser)
         self.assertIn("arcade.game.onSnapshot", browser)
@@ -559,15 +693,13 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(browser.count("arcade.game.requestSnapshot"), 2)
         self.assertNotIn("window.setInterval", browser)
 
-        self.assertIn("local function reset_to_waiting(context)", server)
-        self.assertIn(
-            'context.phase == "countdown" and match.state() == "waiting"',
-            server,
-        )
+        self.assertIn("local function reset_to_waiting(context", server)
+        self.assertIn('context.phase == "countdown"', server)
+        self.assertIn('match.state() == "waiting"', server)
         self.assertIn(
             "context.players[player_info.profileId] = nil", server
         )
-        self.assertIn("local function prune_sequence(context)", server)
+        self.assertIn("local function prune_sequence(context", server)
         self.assertIn("context.sequenceBase", server)
         self.assertIn("context.players = round_players", server)
         self.assertIn("local NIBBLE_DIVISORS", server)
@@ -626,6 +758,14 @@ class RepositoryTests(unittest.TestCase):
         html = (ROOT / "web/index.html").read_text()
         app = (ROOT / "web/js/app.js").read_text()
         self.assertIn('id="account-pill"', html)
+        self.assertIn(
+            'document.addEventListener("pointerdown", (event) => {',
+            app,
+        )
+        self.assertIn(
+            "account.open && !account.contains(event.target)",
+            app,
+        )
         self.assertIn('id="chat-messages"', html)
         self.assertIn('id="chat-form"', html)
         self.assertIn("Welcome back ${profile.nickname}", app)
@@ -635,7 +775,9 @@ class RepositoryTests(unittest.TestCase):
         app = (ROOT / "web/js/app.js").read_text()
         client = (ROOT / "web/js/pocket-arcade.js").read_text()
         css = (ROOT / "web/css/app.css").read_text()
-        guide = (ROOT / "docs/game-development-guide.md").read_text()
+        guide = (
+            ROOT / "docs/PocketArcade-game-development-guide.md"
+        ).read_text()
 
         self.assertIn('id="exit-app-fullscreen"', html)
         self.assertIn("appDisplayCapability(session)", app)
@@ -705,10 +847,12 @@ class RepositoryTests(unittest.TestCase):
             ROOT / "components/game_platform/game_platform.c"
         ).read_text()
         tic_tac_toe = (
-            ROOT / "sdcard-example/apps/tic-tac-toe/server/main.lua"
+            ROOT
+            / "components/builtin_apps/apps/tic-tac-toe/server/main.lua"
         ).read_text()
         tic_tac_toe_client = (
-            ROOT / "sdcard-example/apps/tic-tac-toe/client/app.js"
+            ROOT
+            / "components/builtin_apps/apps/tic-tac-toe/client/app.js"
         ).read_text()
         html = (ROOT / "web/index.html").read_text()
         app = (ROOT / "web/js/app.js").read_text()
@@ -723,8 +867,9 @@ class RepositoryTests(unittest.TestCase):
             tic_tac_toe.index("transport.broadcast_snapshot"),
             tic_tac_toe.index("match.finish({"),
         )
-        self.assertIn(
-            'arcade.game.join("tic-tac-toe")', tic_tac_toe_client
+        self.assertRegex(
+            tic_tac_toe_client,
+            r"arcade\.game\.join\((?:appId|[\"']tic-tac-toe[\"'])\)",
         )
         self.assertIn('id="account-wins"', html)
         self.assertIn("renderWinRoundel", app)

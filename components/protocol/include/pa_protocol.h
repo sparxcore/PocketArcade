@@ -9,6 +9,7 @@
 #define PA_TYPE_PRESENCE_JOINED "presence.joined"
 #define PA_TYPE_PRESENCE_UPDATED "presence.updated"
 #define PA_TYPE_PRESENCE_LEFT "presence.left"
+#define PA_TYPE_PRESENCE_APP "presence.app"
 #define PA_TYPE_STORAGE_MOUNTED "storage.mounted"
 #define PA_TYPE_STORAGE_UNMOUNTED "storage.unmounted"
 #define PA_TYPE_STORAGE_ERROR "storage.error"
