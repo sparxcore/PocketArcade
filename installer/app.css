@@ -44,17 +44,28 @@ main {
   margin-bottom: 3rem;
 }
 
-.hero-beta {
-  margin-left: clamp(-2.5rem, -4vw, -1.25rem);
+.hero-brand {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  width: min(100%, 44rem);
+  margin: 0 0 clamp(1.5rem, 5vw, 2.5rem);
+  transform: translateX(-8%);
 }
 
 .hero-logo {
   display: block;
-  transform: translateX(-8%);
-  width: min(100%, 40rem);
+  flex: 1 1 auto;
+  min-width: 0;
+  width: min(78vw, 40rem);
   height: auto;
-  margin: 0 0 clamp(1.5rem, 5vw, 2.5rem);
-  filter: drop-shadow(0 1rem 2.5rem rgba(103, 58, 255, 0.28));
+  margin: 0;
+}
+
+.hero-beta {
+  flex: 0 0 auto;
+  margin-left: clamp(-2.5rem, -4vw, -1.25rem);
+  white-space: nowrap;
 }
 
 .eyebrow {
