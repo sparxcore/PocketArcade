@@ -98,6 +98,7 @@ button:focus-visible, input:focus-visible, a:focus-visible {
   width: clamp(10.5rem, 32vw, 15rem);
   height: auto;
   filter: drop-shadow(0 6px 16px rgba(126, 105, 255, .45));
+  align-items: center;
 }
 .eyebrow, .step { margin: 0 0 .2rem; color: #9e91ff; font-size: .7rem; font-weight: 850; letter-spacing: .15em; }
 
