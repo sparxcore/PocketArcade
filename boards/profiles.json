@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "minimumRequirements": {
+    "sdCard": true,
+    "psram": true
+  },
+  "profiles": [
+    {
+      "id": "esp32-cam-ai-thinker",
+      "name": "AI-Thinker ESP32-CAM",
+      "idfTarget": "esp32",
+      "chipFamily": "ESP32",
+      "sdkconfigDefaults": [
+        "sdkconfig.defaults",
+        "sdkconfig.board.esp32-cam-ai-thinker"
+      ],
+      "buildDirectory": "build/esp32-cam-ai-thinker",
+      "status": "verified",
+      "publish": true,
+      "hardware": {
+        "flash": "4 MB",
+        "psram": "required",
+        "sdCard": "SDMMC 1-bit: CLK GPIO14, CMD GPIO15, D0 GPIO2"
+      },
+      "notes": "Uses the onboard microSD slot. The camera is not used by PocketArcade.",
+      "references": [
+        "https://github.com/Seeed-Studio/SSCMA-Micro/tree/main/porting/examples/esp32/boards/esp32-camera"
+      ]
+    },
+    {
+      "id": "lilygo-ttgo-t8-classic",
+      "name": "LILYGO TTGO T8 (classic ESP32)",
+      "idfTarget": "esp32",
+      "chipFamily": "ESP32",
+      "sdkconfigDefaults": [
+        "sdkconfig.defaults",
+        "sdkconfig.board.lilygo-ttgo-t8-classic"
+      ],
+      "buildDirectory": "build/lilygo-ttgo-t8-classic",
+      "status": "provisional",
+      "publish": false,
+      "hardware": {
+        "flash": "4 MB",
+        "psram": "required",
+        "sdCard": "SDSPI: CS GPIO33, MOSI GPIO14, MISO GPIO12, CLK GPIO27"
+      },
+      "notes": "For the ESP32-WROVER T8 family documented by LILYGO, including the V1.1/V1.3/V1.7-era layout. It is not for the later ESP32-S2 T8.",
+      "references": [
+        "https://github.com/LilyGO/TTGO-T8-ESP32",
+        "https://wiki.lilygo.cc/zh/products/t8-series/t8/"
+      ]
+    },
+    {
+      "id": "ai-thinker-esp32-a1s-audio-kit-v2-2",
+      "name": "AI-Thinker ESP32-A1S Audio Kit v2.2",
+      "idfTarget": "esp32",
+      "chipFamily": "ESP32",
+      "sdkconfigDefaults": [
+        "sdkconfig.defaults",
+        "sdkconfig.board.ai-thinker-esp32-a1s-audio-kit-v2-2"
+      ],
+      "buildDirectory": "build/ai-thinker-esp32-a1s-audio-kit-v2-2",
+      "status": "provisional",
+      "publish": false,
+      "hardware": {
+        "flash": "4 MB",
+        "psram": "required",
+        "sdCard": "SDMMC 1-bit: CLK GPIO14, CMD GPIO15, D0 GPIO2; detect GPIO34"
+      },
+      "notes": "Targets the Audio Kit v2.2 carrier. PocketArcade does not initialise the AC101 or ES8388 audio codec, so the codec population does not affect this profile.",
+      "references": [
+        "https://github.com/Ai-Thinker-Open/ESP32-A1S-AudioKit",
+        "https://en.ai-thinker.com/pro_view-69.html"
+      ]
+    }
+  ]
+}

@@ -149,11 +149,34 @@ access control is preferred.
 AP-provided DNS. The numeric address is the supported fallback and normal
 operation does not rely on mDNS.
 
-## Build presets
+## Board profiles and build presets
 
-`tools/build_matrix.sh` builds SD-disabled, SDMMC, and SDSPI configurations.
-The SD pin values in the two CI presets are compile placeholders only—they are
-not a claimed board pinout:
+PocketArcade requires both PSRAM and an SD-card slot. Named board profiles
+contain the target, flash settings, SD interface, and pin mapping used for
+release builds:
+
+```sh
+python3 tools/board_profiles.py list
+python3 tools/board_profiles.py validate
+python3 tools/board_profiles.py build esp32-cam-ai-thinker
+```
+
+The current profiles are:
+
+| Profile | Hardware status | Web installer |
+|---|---|---|
+| `esp32-cam-ai-thinker` | Verified | Published |
+| `lilygo-ttgo-t8-classic` | Provisional until hardware bring-up | Withheld |
+| `ai-thinker-esp32-a1s-audio-kit-v2-2` | Provisional until hardware bring-up | Withheld |
+
+Provisional profiles compile as part of `build-all`, but the GitHub Pages
+packager excludes them until their SD and PSRAM configuration has been checked
+on the exact PCB revision. See [`docs/board-profiles.md`](docs/board-profiles.md)
+for the pin maps and promotion checklist.
+
+`tools/build_matrix.sh` still builds SD-disabled, SDMMC, and SDSPI configurations
+as compile coverage. The SD pin values in the two CI presets are placeholders
+only—they are not a claimed board pinout:
 
 ```sh
 ./tools/build_matrix.sh esp32
@@ -170,6 +193,17 @@ This preset selects classic ESP32, 4 MB DIO flash, and the onboard SDMMC slot
 in 1-bit mode (CLK GPIO14, CMD GPIO15, D0 GPIO2). It deliberately leaves D1
 GPIO4 and D2 GPIO12 unused. Confirm the board is actually the AI-Thinker layout
 before using it; other products sold as “ESP32-CAM” can differ.
+
+To assemble the static browser installer from completed builds:
+
+```sh
+python3 tools/board_profiles.py package --output dist/pages
+```
+
+The manual **Build firmware installer** GitHub Actions workflow builds every
+profile, packages verified profiles with ESP Web Tools manifests, and deploys
+the static result to GitHub Pages. Enable **GitHub Actions** as the Pages source
+in the repository settings before its first run.
 
 To prepare embedded assets manually:
 

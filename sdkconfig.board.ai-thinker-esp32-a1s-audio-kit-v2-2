@@ -1,23 +1,23 @@
-# AI-Thinker ESP32-CAM (classic ESP32, onboard microSD slot).
-# Use only when the module matches the AI-Thinker schematic.
+# AI-Thinker ESP32-A1S Audio Kit v2.2 carrier with onboard microSD.
+# PocketArcade does not initialise either supported audio-codec population.
 CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_40M=y
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 
-# PSRAM is a PocketArcade hardware requirement. Do not boot this profile when
-# external RAM cannot be initialised.
+# The ESP32-A1S module includes PSRAM and PocketArcade requires it.
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_TYPE_AUTO=y
 CONFIG_SPIRAM_SPEED_40M=y
 # CONFIG_SPIRAM_IGNORE_NOTFOUND is not set
 CONFIG_SPIRAM_USE_CAPS_ALLOC=y
 
-# PocketArcade is intentionally open by default for quick local joining.
 CONFIG_PA_AP_PASSWORD=""
 CONFIG_PA_HTTP_MAX_URI_HANDLERS=36
 CONFIG_PA_AVATAR_MAX_BYTES=12288
 CONFIG_PA_SD_FORMAT_IF_UNMOUNTABLE=y
 
+# Use the native ESP32 SDMMC slot in 1-bit mode. The board's SD/JTAG DIP
+# switches must route these signals to the card socket.
 # CONFIG_PA_SD_DISABLED is not set
 CONFIG_PA_SD_SDMMC=y
 # CONFIG_PA_SD_SDSPI is not set
@@ -27,11 +27,11 @@ CONFIG_PA_SD_CLOCK_KHZ=20000
 CONFIG_PA_SDMMC_CLK_PIN=14
 CONFIG_PA_SDMMC_CMD_PIN=15
 CONFIG_PA_SDMMC_D0_PIN=2
-CONFIG_PA_SD_CARD_DETECT_PIN=-1
+CONFIG_PA_SD_CARD_DETECT_PIN=34
+CONFIG_PA_SD_CARD_DETECT_ACTIVE_LOW=y
+# CONFIG_PA_SD_CARD_DETECT_INTERNAL_PULL is not set
 CONFIG_PA_SD_POWER_PIN=-1
 
-# Keep enough bounded Wi-Fi buffering for four phones without starving the
-# authoritative Lua runtime and snapshot serializer on internal-RAM boards.
 CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=16
 CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=16
 CONFIG_ESP_WIFI_MGMT_SBUF_NUM=16

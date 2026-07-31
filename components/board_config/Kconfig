@@ -333,6 +333,15 @@ config PA_SD_CARD_DETECT_ACTIVE_LOW
     default y
     depends on PA_SD_CARD_DETECT_PIN >= 0
 
+config PA_SD_CARD_DETECT_INTERNAL_PULL
+    bool "Enable internal pull resistor on card-detect GPIO"
+    default y
+    depends on PA_SD_CARD_DETECT_PIN >= 0
+    help
+        Disable this when the board supplies an external pull resistor or the
+        selected GPIO does not support internal pulls (for example, classic
+        ESP32 GPIO34-GPIO39).
+
 config PA_SD_POWER_PIN
     int "SD power-control GPIO (-1 disables)"
     range -1 48

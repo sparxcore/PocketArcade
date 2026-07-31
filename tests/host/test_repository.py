@@ -241,6 +241,9 @@ class RepositoryTests(unittest.TestCase):
             self.assertIn(f'"{blocked}"', runtime)
 
         defaults = (ROOT / "sdkconfig.defaults").read_text()
+        board_catalogue = json.loads(
+            (ROOT / "boards" / "profiles.json").read_text()
+        )
         board_defaults = (
             ROOT / "sdkconfig.board.esp32-cam-ai-thinker"
         ).read_text()
@@ -257,10 +260,34 @@ class RepositoryTests(unittest.TestCase):
             self.assertIn(setting, board_defaults)
         for setting in (
             "CONFIG_SPIRAM=y",
-            "CONFIG_SPIRAM_IGNORE_NOTFOUND=y",
             "CONFIG_SPIRAM_USE_CAPS_ALLOC=y",
         ):
             self.assertIn(setting, board_defaults)
+        self.assertNotIn(
+            "CONFIG_SPIRAM_IGNORE_NOTFOUND=y", board_defaults
+        )
+        self.assertTrue(board_catalogue["minimumRequirements"]["sdCard"])
+        self.assertTrue(board_catalogue["minimumRequirements"]["psram"])
+        self.assertEqual(len(board_catalogue["profiles"]), 3)
+        for profile in board_catalogue["profiles"]:
+            combined = "\n".join(
+                (ROOT / path).read_text()
+                for path in profile["sdkconfigDefaults"]
+            )
+            self.assertIn("CONFIG_SPIRAM=y", combined)
+            self.assertNotIn(
+                "CONFIG_SPIRAM_IGNORE_NOTFOUND=y", combined
+            )
+            self.assertEqual(
+                sum(
+                    setting in combined
+                    for setting in (
+                        "CONFIG_PA_SD_SDMMC=y",
+                        "CONFIG_PA_SD_SDSPI=y",
+                    )
+                ),
+                1,
+            )
         for excluded_source in (
             "src/liolib.c",
             "src/loslib.c",

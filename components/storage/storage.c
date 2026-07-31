@@ -505,10 +505,12 @@ esp_err_t storage_init(void)
         gpio_config_t detect = {
             .pin_bit_mask = gpio_pin_mask(CONFIG_PA_SD_CARD_DETECT_PIN),
             .mode = GPIO_MODE_INPUT,
+#if CONFIG_PA_SD_CARD_DETECT_INTERNAL_PULL
 #if CONFIG_PA_SD_CARD_DETECT_ACTIVE_LOW
             .pull_up_en = GPIO_PULLUP_ENABLE,
 #else
             .pull_down_en = GPIO_PULLDOWN_ENABLE,
+#endif
 #endif
         };
         ESP_ERROR_CHECK(gpio_config(&detect));
