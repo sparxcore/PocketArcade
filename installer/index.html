@@ -19,6 +19,13 @@
   <body>
     <main>
       <header class="hero">
+        <img
+          class="hero-logo"
+          src="assets/logo-horizontal.webp"
+          alt="PocketArcade"
+          width="640"
+          height="192"
+        >
         <p class="eyebrow">PocketArcade firmware installer</p>
         <h1>Turn an ESP32 into a pocket-sized arcade.</h1>
         <p>
@@ -43,7 +50,7 @@
             <p class="eyebrow">Supported hardware</p>
             <h2 id="boards-title">Choose your board</h2>
           </div>
-          <p id="version"></p>
+          <p id="version" aria-live="polite"></p>
         </div>
         <div id="boards" class="boards" aria-live="polite">
           <p>Loading board profiles…</p>

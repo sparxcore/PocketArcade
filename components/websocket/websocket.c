@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include "app_catalogue.h"
 #include "cJSON.h"
 #include "chat.h"
 #include "esp_log.h"
@@ -36,6 +37,8 @@ typedef struct {
     int fd;
     char connection_id[PA_CONNECTION_ID_LEN + 1];
     public_profile_t profile;
+    char open_app_id[PA_APP_ID_MAX + 1];
+    uint64_t open_app_order;
     uint64_t rate_window_started;
     unsigned rate_count;
     outbound_message_t critical[CONFIG_PA_WS_OUTBOUND_QUEUE_LENGTH];
@@ -53,6 +56,7 @@ static SemaphoreHandle_t clients_lock;
 static TaskHandle_t outbound_task_handle;
 static uint32_t server_sequence = 100;
 static uint64_t outbound_sequence;
+static uint64_t presence_activity_sequence;
 
 /*
  * ESP-IDF's WebSocket frame helper calls the session send function once for
@@ -124,6 +128,56 @@ static ws_client_t *reserve_fd_locked(int fd)
         }
     }
     return NULL;
+}
+
+static void effective_open_app_locked(
+    const char *profile_id, char output[PA_APP_ID_MAX + 1],
+    bool *has_authenticated_connection)
+{
+    uint64_t latest_order = 0;
+    output[0] = '\0';
+    if (has_authenticated_connection) {
+        *has_authenticated_connection = false;
+    }
+    for (size_t i = 0; i < CONFIG_PA_WS_MAX_CONNECTIONS; ++i) {
+        const ws_client_t *candidate = &clients[i];
+        if (!candidate->used || !candidate->authenticated ||
+            strcmp(candidate->profile.id, profile_id) != 0) {
+            continue;
+        }
+        if (has_authenticated_connection) {
+            *has_authenticated_connection = true;
+        }
+        if (candidate->open_app_id[0] &&
+            (!output[0] || candidate->open_app_order >= latest_order)) {
+            latest_order = candidate->open_app_order;
+            strlcpy(output, candidate->open_app_id,
+                    PA_APP_ID_MAX + 1);
+        }
+    }
+}
+
+static esp_err_t set_connection_open_app(int fd,
+                                         const char *profile_id,
+                                         const char *open_app_id)
+{
+    char effective_app_id[PA_APP_ID_MAX + 1] = {0};
+    bool found = false;
+    xSemaphoreTake(clients_lock, portMAX_DELAY);
+    ws_client_t *client = find_fd_locked(fd);
+    if (client && client->authenticated &&
+        strcmp(client->profile.id, profile_id) == 0) {
+        strlcpy(client->open_app_id,
+                open_app_id ? open_app_id : "",
+                sizeof(client->open_app_id));
+        client->open_app_order = ++presence_activity_sequence;
+        effective_open_app_locked(profile_id, effective_app_id, NULL);
+        found = true;
+    }
+    xSemaphoreGive(clients_lock);
+    if (!found) return ESP_ERR_NOT_FOUND;
+    return presence_set_open_app(
+        profile_id, effective_app_id[0] ? effective_app_id : NULL);
 }
 
 static void release_outbound(outbound_message_t *message)
@@ -407,7 +461,8 @@ static void game_transport_send_binary(
     (void)send_binary_fd(fd, payload, payload_length, true);
 }
 
-static cJSON *presence_player(const public_profile_t *profile, bool online)
+static cJSON *presence_player(const public_profile_t *profile, bool online,
+                              const char *open_app_id)
 {
     cJSON *player = cJSON_CreateObject();
     cJSON_AddStringToObject(player, "id", profile->id);
@@ -427,11 +482,17 @@ static cJSON *presence_player(const public_profile_t *profile, bool online)
     cJSON_AddStringToObject(player, "role",
                             profile->admin ? "admin" : "player");
     cJSON_AddNumberToObject(player, "wins", profile->wins);
+    if (open_app_id && open_app_id[0]) {
+        cJSON_AddStringToObject(player, "openAppId", open_app_id);
+    } else {
+        cJSON_AddNullToObject(player, "openAppId");
+    }
     return player;
 }
 
 static void on_presence_event(presence_event_t event,
-                              const public_profile_t *profile)
+                              const public_profile_t *profile,
+                              const char *open_app_id)
 {
     if (event == PRESENCE_EVENT_UPDATED) {
         game_platform_profile_updated(profile);
@@ -447,13 +508,15 @@ static void on_presence_event(presence_event_t event,
 
     const char *type = event == PRESENCE_EVENT_JOINED
                            ? PA_TYPE_PRESENCE_JOINED
-                           : event == PRESENCE_EVENT_UPDATED
+                           : event == PRESENCE_EVENT_UPDATED ||
+                                     event == PRESENCE_EVENT_ACTIVITY
                                  ? PA_TYPE_PRESENCE_UPDATED
                                  : PA_TYPE_PRESENCE_LEFT;
     cJSON *payload = cJSON_CreateObject();
     cJSON_AddItemToObject(payload, "player",
                           presence_player(profile,
-                                          event != PRESENCE_EVENT_LEFT));
+                                          event != PRESENCE_EVENT_LEFT,
+                                          open_app_id));
     broadcast(type, payload);
 }
 
@@ -726,6 +789,24 @@ static esp_err_t websocket_handler(httpd_req_t *request)
                 fd, id, "profile_required",
                 "Complete the player handshake before sending messages.");
             err = ESP_OK;
+        } else if (strcmp(type->valuestring, PA_TYPE_PRESENCE_APP) == 0) {
+            cJSON *app_id_json =
+                cJSON_GetObjectItemCaseSensitive(payload, "appId");
+            const char *app_id = NULL;
+            bool valid = cJSON_IsNull(app_id_json);
+            if (cJSON_IsString(app_id_json) && app_id_json->valuestring[0]) {
+                app_descriptor_t application;
+                app_id = app_id_json->valuestring;
+                valid = app_catalogue_get(app_id, &application);
+            }
+            if (valid &&
+                set_connection_open_app(fd, profile.id, app_id) == ESP_OK) {
+                err = ESP_OK;
+            } else {
+                err = send_feature_error(
+                    fd, id, PA_TYPE_ERROR_PROTOCOL, "invalid_application",
+                    "Choose an installed application.");
+            }
         } else if (strcmp(type->valuestring, PA_TYPE_CHAT_SEND) == 0) {
             cJSON *text = cJSON_GetObjectItemCaseSensitive(payload, "text");
             cJSON *message = NULL;
@@ -855,6 +936,8 @@ void websocket_socket_closed(int socket_fd)
     if (!clients_lock) return;
     char profile_id[PA_PROFILE_ID_LEN + 1] = {0};
     char connection_id[PA_CONNECTION_ID_LEN + 1] = {0};
+    char effective_app_id[PA_APP_ID_MAX + 1] = {0};
+    bool has_other_connection = false;
     xSemaphoreTake(clients_lock, portMAX_DELAY);
     ws_client_t *client = find_fd_locked(socket_fd);
     if (client) {
@@ -865,8 +948,16 @@ void websocket_socket_closed(int socket_fd)
         clear_outbound_locked(client);
         memset(client, 0, sizeof(*client));
     }
+    if (profile_id[0]) {
+        effective_open_app_locked(profile_id, effective_app_id,
+                                  &has_other_connection);
+    }
     xSemaphoreGive(clients_lock);
     if (connection_id[0]) game_platform_connection_closed(connection_id);
+    if (profile_id[0] && has_other_connection) {
+        (void)presence_set_open_app(
+            profile_id, effective_app_id[0] ? effective_app_id : NULL);
+    }
     if (profile_id[0]) presence_connection_closed(profile_id);
     if (connection_id[0]) {
         ESP_LOGI(TAG, "WebSocket %.18s closed", connection_id);

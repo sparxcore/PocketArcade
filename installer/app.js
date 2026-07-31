@@ -33,6 +33,16 @@ function boardCard(board) {
   notes.className = "notes";
   notes.textContent = board.notes;
 
+  if (board.status === "provisional") {
+    const caution = document.createElement("p");
+    caution.className = "profile-caution";
+    caution.textContent =
+      "Provisional profile: verify the board model and PCB revision before flashing.";
+    article.append(badge, heading, details, notes, caution);
+  } else {
+    article.append(badge, heading, details, notes);
+  }
+
   const installer = document.createElement("esp-web-install-button");
   installer.setAttribute("manifest", board.manifest);
 
@@ -54,7 +64,7 @@ function boardCard(board) {
     "Serial access requires this installer to be served over HTTPS.";
 
   installer.append(activate, unsupported, notAllowed);
-  article.append(badge, heading, details, notes, installer);
+  article.append(installer);
   return article;
 }
 

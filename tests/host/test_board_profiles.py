@@ -2,6 +2,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -91,6 +92,46 @@ class BoardProfileTests(unittest.TestCase):
                 },
                 {0x1000, 0x8000, 0x10000},
             )
+
+    def test_pages_package_can_offer_every_board_and_includes_branding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+
+            def fake_package(profile, destination, version):
+                return {
+                    "id": profile["id"],
+                    "name": profile["name"],
+                    "status": profile["status"],
+                    "manifest": f"firmware/{profile['id']}/manifest.json",
+                }
+
+            with mock.patch.object(
+                self.tool, "package_profile", side_effect=fake_package
+            ):
+                self.tool.package_installer(
+                    self.profiles,
+                    output,
+                    self.tool.project_version(),
+                    include_provisional=True,
+                )
+
+            boards = json.loads((output / "boards.json").read_text())
+            self.assertEqual(
+                {board["id"] for board in boards["boards"]},
+                set(self.profiles),
+            )
+            self.assertEqual(
+                (output / "assets" / "logo-horizontal.webp").read_bytes(),
+                self.tool.BRAND_ASSET.read_bytes(),
+            )
+            page = (output / "index.html").read_text()
+            self.assertIn('src="assets/logo-horizontal.webp"', page)
+
+    def test_pages_workflow_publishes_provisional_board_choices(self):
+        workflow = (
+            ROOT / ".github" / "workflows" / "firmware-pages.yml"
+        ).read_text()
+        self.assertGreaterEqual(workflow.count("--include-provisional"), 2)
 
 
 if __name__ == "__main__":

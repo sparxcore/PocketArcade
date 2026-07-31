@@ -386,6 +386,13 @@ class PocketArcadeClient {
     return this.send("chat.send", { text });
   }
 
+  setOpenApp(appId) {
+    if (appId !== null && (typeof appId !== "string" || !appId)) {
+      return false;
+    }
+    return this.send("presence.app", { appId });
+  }
+
   joinGame(appId, matchId = null) {
     if (typeof appId !== "string" || !appId) return false;
     return this.send("game.join", {
@@ -515,6 +522,17 @@ class PocketArcadeClient {
     this.storage = storage;
     this.emit("storage.changed", storage);
     return storage;
+  }
+
+  async refreshDeviceStats() {
+    const [health, storage] = await Promise.all([
+      this.request("/api/v1/health"),
+      this.request("/api/v1/storage"),
+    ]);
+    this.health = health;
+    this.storage = storage;
+    this.emit("storage.changed", storage);
+    return { health, storage };
   }
 
   async waitForStorage(predicate, timeoutMs = 12000) {

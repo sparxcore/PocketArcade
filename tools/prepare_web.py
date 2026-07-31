@@ -13,6 +13,9 @@ ROUTES = {
     "js/pocket-arcade.js": ["/system/pocket-arcade.js"],
     "js/app.js": ["/system/app.js"],
     "assets/icon.svg": ["/assets/system/icon.svg"],
+    "assets/logo-horizontal.webp": [
+        "/assets/system/logo-horizontal.webp"
+    ],
     "assets/portal-horizontal.jpg": [
         "/assets/system/portal-horizontal.jpg"
     ],
@@ -27,6 +30,7 @@ MIME = {
     ".js": "text/javascript; charset=utf-8",
     ".svg": "image/svg+xml",
     ".jpg": "image/jpeg",
+    ".webp": "image/webp",
 }
 
 

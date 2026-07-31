@@ -14,11 +14,8 @@
   <a class="skip-link" href="#main">Skip to content</a>
   <main id="main" class="shell">
     <header class="brand">
-      <img src="/assets/system/icon.svg" alt="" width="48" height="48">
-      <div>
-        <p class="eyebrow">LOCAL MULTIPLAYER</p>
-        <h1>PocketArcade</h1>
-      </div>
+      <img class="brand-logo" src="/assets/system/logo-horizontal.webp"
+           alt="PocketArcade" width="240" height="72">
       <div class="header-actions">
         <span id="connection-pill" class="status-pill" aria-live="polite">Starting</span>
         <details id="account-pill" class="account-pill" hidden>
@@ -91,25 +88,36 @@
             <p id="empty-players" class="empty">Waiting for players to join…</p>
           </section>
 
-          <section class="card chat-card" aria-labelledby="chat-title">
+          <section id="chat-card" class="card chat-card is-collapsed"
+                   aria-labelledby="chat-title">
             <div class="section-heading">
               <div>
                 <p class="step">LIVE</p>
                 <h2 id="chat-title">Chat</h2>
               </div>
-              <span class="chat-limit">Last 50</span>
+              <div class="chat-heading-actions">
+                <span class="chat-limit">Last 50</span>
+                <button id="chat-toggle" class="chat-toggle" type="button"
+                        aria-expanded="false" aria-controls="chat-body">
+                  <span id="chat-unread" class="chat-unread" hidden></span>
+                  <span id="chat-toggle-label">Expand</span>
+                  <span class="chat-toggle-icon" aria-hidden="true">⌃</span>
+                </button>
+              </div>
             </div>
-            <ol id="chat-messages" class="chat-messages" role="log"
-                aria-live="polite" aria-relevant="additions"></ol>
-            <p id="empty-chat" class="empty">No messages yet. Say hello!</p>
-            <form id="chat-form" class="chat-form">
-              <label class="sr-only" for="chat-input">Message</label>
-              <input id="chat-input" type="text" maxlength="320"
-                     autocomplete="off" enterkeyhint="send"
-                     placeholder="Message everyone">
-              <button id="chat-send" class="primary" type="submit">Send</button>
-            </form>
-            <p id="chat-error" class="error compact-error" role="alert"></p>
+            <div id="chat-body" hidden>
+              <ol id="chat-messages" class="chat-messages" role="log"
+                  aria-live="polite" aria-relevant="additions"></ol>
+              <p id="empty-chat" class="empty">No messages yet. Say hello!</p>
+              <form id="chat-form" class="chat-form">
+                <label class="sr-only" for="chat-input">Message</label>
+                <input id="chat-input" type="text" maxlength="320"
+                       autocomplete="off" enterkeyhint="send"
+                       placeholder="Message everyone">
+                <button id="chat-send" class="primary" type="submit">Send</button>
+              </form>
+              <p id="chat-error" class="error compact-error" role="alert"></p>
+            </div>
           </section>
         </div>
 
@@ -119,13 +127,28 @@
               <p class="step">LAUNCHER</p>
               <h2 id="games-title">Games</h2>
             </div>
-            <span class="storage-dot" aria-hidden="true"></span>
+            <div class="app-heading-actions">
+              <span class="storage-dot" aria-hidden="true"></span>
+              <div class="app-view-toggle" role="group"
+                   aria-label="Game display">
+                <button id="app-view-list" class="app-view-option"
+                        type="button" aria-pressed="true">
+                  <span aria-hidden="true">☷</span>
+                  <span>List</span>
+                </button>
+                <button id="app-view-grid" class="app-view-option"
+                        type="button" aria-pressed="false">
+                  <span aria-hidden="true">▦</span>
+                  <span>Tiles</span>
+                </button>
+              </div>
+            </div>
           </div>
-          <div id="app-list" class="app-list"></div>
+          <div id="app-list" class="app-list" aria-live="polite"></div>
           <div id="empty-apps" class="empty-state">
             <span class="empty-icon" aria-hidden="true">✦</span>
-            <h3>No games installed yet</h3>
-            <p>Insert the PocketArcade SD card to load games.</p>
+            <h3>No games available yet</h3>
+            <p>Insert a PocketArcade SD card to add games.</p>
           </div>
         </section>
       </div>
@@ -145,13 +168,6 @@
         <p id="app-error" class="error" role="alert"></p>
       </section>
 
-      <section class="storage-bar" aria-live="polite">
-        <span id="storage-indicator" class="storage-indicator"></span>
-        <div class="storage-copy">
-          <strong id="storage-title">Checking storage</strong>
-          <p id="storage-detail">Please wait…</p>
-        </div>
-      </section>
     </section>
 
     <section id="fatal-view" class="card view" hidden>
@@ -182,7 +198,37 @@
   <dialog id="admin-dialog">
     <form method="dialog">
       <p class="step">ADMINISTRATOR</p>
-      <h2>SD card controls</h2>
+      <h2>Device status &amp; SD card</h2>
+      <div class="admin-metrics" role="group"
+           aria-label="Current device resource usage">
+        <section class="admin-metric">
+          <div id="cpu-gauge" class="admin-gauge cpu-gauge"
+               role="progressbar" aria-label="CPU usage"
+               aria-valuemin="0" aria-valuemax="100">
+            <span id="cpu-gauge-value">—</span>
+          </div>
+          <strong>CPU</strong>
+          <small id="cpu-gauge-detail">Sampling…</small>
+        </section>
+        <section class="admin-metric">
+          <div id="ram-gauge" class="admin-gauge ram-gauge"
+               role="progressbar" aria-label="RAM usage"
+               aria-valuemin="0" aria-valuemax="100">
+            <span id="ram-gauge-value">—</span>
+          </div>
+          <strong>RAM</strong>
+          <small id="ram-gauge-detail">Checking…</small>
+        </section>
+        <section class="admin-metric">
+          <div id="sd-gauge" class="admin-gauge sd-gauge"
+               role="progressbar" aria-label="SD card usage"
+               aria-valuemin="0" aria-valuemax="100">
+            <span id="sd-gauge-value">—</span>
+          </div>
+          <strong>SD card</strong>
+          <small id="sd-gauge-detail">Checking…</small>
+        </section>
+      </div>
       <p id="admin-storage-status">
         Checking removable storage…
       </p>

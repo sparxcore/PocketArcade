@@ -16,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CATALOGUE_PATH = ROOT / "boards" / "profiles.json"
 INSTALLER_SOURCE = ROOT / "installer"
+BRAND_ASSET = ROOT / "web" / "assets" / "logo-horizontal.webp"
 
 
 class ProfileError(RuntimeError):
@@ -246,6 +247,11 @@ def package_installer(
             shutil.copytree(source, target, dirs_exist_ok=True)
         else:
             shutil.copy2(source, target)
+    if not BRAND_ASSET.is_file():
+        raise ProfileError(f"installer branding is missing: {BRAND_ASSET}")
+    brand_output = output / "assets"
+    brand_output.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(BRAND_ASSET, brand_output / BRAND_ASSET.name)
 
     packaged = []
     for profile in profiles.values():

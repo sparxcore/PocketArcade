@@ -148,12 +148,22 @@ static const char *request_fingerprint(httpd_req_t *request,
 
 static esp_err_t health_handler(httpd_req_t *request)
 {
+    system_metrics_t metrics;
+    system_metrics_get(&metrics);
     cJSON *root = cJSON_CreateObject();
     cJSON_AddBoolToObject(root, "ok", true);
     cJSON_AddStringToObject(root, "device", PA_PRODUCT_NAME);
     cJSON_AddStringToObject(root, "firmwareVersion", PA_FIRMWARE_VERSION);
     cJSON_AddNumberToObject(root, "protocolVersion", PA_PROTOCOL_VERSION);
     cJSON_AddNumberToObject(root, "uptimeMs", (double)system_uptime_ms());
+    cJSON_AddNumberToObject(root, "cpuUsagePercent",
+                            (double)metrics.cpu_usage_percent);
+    cJSON_AddBoolToObject(root, "cpuSampleReady",
+                          metrics.cpu_sample_ready);
+    cJSON_AddNumberToObject(root, "ramTotalBytes",
+                            (double)metrics.ram_total_bytes);
+    cJSON_AddNumberToObject(root, "ramFreeBytes",
+                            (double)metrics.ram_free_bytes);
     cJSON_AddBoolToObject(root, "sdMounted", storage_is_mounted());
     cJSON_AddNumberToObject(root, "connectedPlayers",
                             (double)presence_online_count());

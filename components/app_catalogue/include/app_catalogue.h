@@ -18,6 +18,11 @@ typedef enum {
     APP_LATE_JOIN_SPECTATOR,
 } app_late_join_t;
 
+typedef enum {
+    APP_SOURCE_SD,
+    APP_SOURCE_BUILTIN,
+} app_source_t;
+
 #define APP_CAP_PRESENCE_READ (1u << 0)
 #define APP_CAP_MATCH_SEATS (1u << 1)
 #define APP_CAP_MATCH_RESULTS (1u << 2)
@@ -25,6 +30,7 @@ typedef enum {
 
 typedef struct {
     bool used;
+    app_source_t source;
     int manifest_version;
     char id[PA_APP_ID_MAX + 1];
     char name[65];
