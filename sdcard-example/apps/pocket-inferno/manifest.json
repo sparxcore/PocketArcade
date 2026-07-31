@@ -1,9 +1,9 @@
 {
   "manifestVersion": 2,
-  "id": "tic-tac-toe",
-  "name": "Tic-Tac-Toe",
-  "description": "A polished two-player classic with live spectators and PocketArcade styling.",
-  "version": "1.2.2",
+  "id": "pocket-inferno",
+  "name": "Pocket Inferno",
+  "description": "Fast 2–4 player textured raycast arena combat. No bots, no waiting around.",
+  "version": "0.1.13",
   "minPlatformVersion": "0.3.0",
   "kind": "game",
   "client": {
@@ -13,11 +13,12 @@
   "runtime": {
     "type": "lua",
     "entrypoint": "server/main.lua",
-    "mode": "event"
+    "mode": "tick",
+    "tickRateHz": 15
   },
   "multiplayer": {
     "minPlayers": 2,
-    "maxPlayers": 2,
+    "maxPlayers": 4,
     "spectators": true,
     "lateJoin": "spectator",
     "reconnectGraceMs": 30000
@@ -26,7 +27,6 @@
     "version": 1
   },
   "capabilities": [
-    "presence.read",
     "match.seats",
     "match.results"
   ]

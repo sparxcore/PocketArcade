@@ -1,81 +1,1173 @@
-.ttt-app {
-  display: grid;
-  gap: 1rem;
+.pocket-tic-tac-toe {
+  --pa-bg: #151226;
+  --pa-panel: #211c38;
+  --pa-panel-raised: #2c2548;
+  --pa-ink: #fffaf2;
+  --pa-muted: #bdb7ce;
+  --pa-line: rgba(255, 255, 255, .11);
+  --pa-board: #fffdf8;
+  --pa-board-edge: #d7cbb8;
+  --pa-spectator: #7f7a8d;
+  --pa-spectator-dark: #5b5668;
+  --pa-danger: #ef5d67;
+  --pa-success: #21b88c;
+  --pa-gold: #f5b83d;
+  --pa-seat-1: #ef5d67;
+  --pa-seat-1-dark: #b62f49;
+  --pa-seat-1-soft: #ffd3d0;
+  --pa-seat-2: #21b88c;
+  --pa-seat-2-dark: #08775f;
+  --pa-seat-2-soft: #c8f6df;
+  --pa-radius-app: 26px;
+  --pa-radius-panel: 22px;
+  --pa-radius-card: 16px;
+  --pa-radius-control: 13px;
+  --pa-shadow-small: 0 8px 20px rgba(0, 0, 0, .18);
+  --pa-shadow-panel: 0 16px 30px rgba(0, 0, 0, .24);
+  --pa-shadow-piece: 0 5px 10px rgba(0, 0, 0, .24);
+  --pa-shadow-overlay: 0 24px 54px rgba(0, 0, 0, .38);
+
+  position: relative;
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--pa-line);
+  border-radius: var(--pa-radius-app);
+  color: var(--pa-ink);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(128, 103, 237, .24), transparent 30rem),
+    radial-gradient(circle at 100% 82%, rgba(239, 93, 103, .16), transparent 28rem),
+    var(--pa-bg);
+  box-shadow: var(--pa-shadow-panel);
+  font-family: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+  isolation: isolate;
 }
 
-.ttt-seats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: .65rem;
+.pocket-tic-tac-toe[hidden],
+.pocket-tic-tac-toe [hidden] {
+  display: none !important;
 }
 
-.ttt-seat {
+.pocket-tic-tac-toe.is-fullscreen {
+  height: var(--pa-visible-height, 100dvh);
+  min-height: 0;
+  max-height: var(--pa-visible-height, 100dvh);
+  border-width: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.pocket-tic-tac-toe__topbar {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .65rem .8rem;
+  border-bottom: 1px solid var(--pa-line);
+  background: rgba(21, 18, 38, .82);
+}
+
+.pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__topbar {
+  padding-right: 7.5rem;
+}
+
+.pocket-tic-tac-toe__brand,
+.pocket-tic-tac-toe__topbar-actions,
+.pocket-tic-tac-toe__connection,
+.pocket-tic-tac-toe__membership-actions,
+.pocket-tic-tac-toe__result-actions,
+.pocket-tic-tac-toe__splash-chips {
+  display: flex;
+  align-items: center;
+}
+
+.pocket-tic-tac-toe__brand {
   min-width: 0;
-  padding: .75rem;
-  border: 1px solid rgba(255, 255, 255, .12);
-  border-radius: .8rem;
-  background: rgba(255, 255, 255, .04);
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  gap: .6rem;
 }
 
-.ttt-seat span {
+.pocket-tic-tac-toe__brand-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  box-shadow: var(--pa-shadow-small);
+}
+
+.pocket-tic-tac-toe__brand-copy,
+.pocket-tic-tac-toe__membership-status,
+.pocket-tic-tac-toe__player-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.pocket-tic-tac-toe__brand-copy {
+  flex: 0 1 auto;
+}
+
+.pocket-tic-tac-toe__title {
+  overflow: hidden;
+  font-size: 1.08rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pocket-tic-tac-toe__subtitle,
+.pocket-tic-tac-toe__membership-text,
+.pocket-tic-tac-toe__player-state,
+.pocket-tic-tac-toe__control-text,
+.pocket-tic-tac-toe__overlay-text {
+  color: var(--pa-muted);
+  font-size: .72rem;
+  line-height: 1.35;
+}
+
+.pocket-tic-tac-toe__topbar-actions {
+  flex: 0 0 auto;
+  gap: .5rem;
+}
+
+.pocket-tic-tac-toe__connection {
+  min-height: 36px;
+  gap: .4rem;
+  padding: .4rem .6rem;
+  border: 1px solid var(--pa-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .06);
+  color: var(--pa-muted);
+  font-size: .68rem;
+  font-weight: 800;
+}
+
+.pocket-tic-tac-toe__connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--pa-gold);
+  box-shadow: 0 0 0 3px rgba(245, 184, 61, .15);
+}
+
+.pocket-tic-tac-toe__connection.is-connected .pocket-tic-tac-toe__connection-dot {
+  background: var(--pa-success);
+  box-shadow: 0 0 0 3px rgba(33, 184, 140, .15);
+}
+
+.pocket-tic-tac-toe__icon-button,
+.pocket-tic-tac-toe__button,
+.pocket-tic-tac-toe__cell {
+  -webkit-tap-highlight-color: transparent;
+  font: inherit;
+}
+
+.pocket-tic-tac-toe__icon-button {
+  min-width: 44px;
+  min-height: 38px;
+  padding: .4rem .65rem;
+  border: 1px solid var(--pa-line);
+  border-radius: 12px;
+  color: var(--pa-ink);
+  background: rgba(255, 255, 255, .07);
+  font-size: .7rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pocket-tic-tac-toe__icon-button:focus-visible,
+.pocket-tic-tac-toe__button:focus-visible,
+.pocket-tic-tac-toe__cell:focus-visible {
+  outline: 3px solid rgba(255, 244, 188, .92);
+  outline-offset: 3px;
+}
+
+.pocket-tic-tac-toe__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.pocket-tic-tac-toe__splash {
+  display: flex;
+  min-height: 31rem;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  padding: clamp(.75rem, 2.5vw, 1.5rem);
+}
+
+.pocket-tic-tac-toe__splash-visual {
+  width: min(100%, 50rem);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 24px;
+  background: #0d081b;
+  box-shadow: var(--pa-shadow-overlay);
+}
+
+.pocket-tic-tac-toe__splash-image {
   display: block;
-  color: #b9b3d0;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  user-select: none;
+}
+
+.pocket-tic-tac-toe__splash-panel {
+  display: flex;
+  width: min(100%, 50rem);
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .8rem;
+  border: 1px solid var(--pa-line);
+  border-radius: 20px;
+  background: rgba(33, 28, 56, .92);
+  box-shadow: var(--pa-shadow-small);
+}
+
+.pocket-tic-tac-toe__splash-details {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: .45rem;
+}
+
+.pocket-tic-tac-toe__splash-prompt {
+  font-size: .9rem;
+  line-height: 1.2;
+}
+
+.pocket-tic-tac-toe__splash-chips {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: .4rem;
+}
+
+.pocket-tic-tac-toe__splash-join {
+  min-width: 10rem;
+  flex: 0 0 auto;
+}
+
+.pocket-tic-tac-toe__chip {
+  padding: .32rem .58rem;
+  border: 1px solid var(--pa-line);
+  border-radius: 999px;
+  color: var(--pa-ink);
+  background: rgba(255, 255, 255, .06);
+  font-size: .64rem;
+  font-weight: 800;
+}
+
+.pocket-tic-tac-toe__game-view {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.pocket-tic-tac-toe__main {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(160px, 205px) minmax(0, 1fr);
+  gap: .75rem;
+  padding: .75rem;
+}
+
+.pocket-tic-tac-toe__player-rail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: .5rem;
+  padding: .65rem;
+  border: 1px solid var(--pa-line);
+  border-radius: var(--pa-radius-panel);
+  background: rgba(33, 28, 56, .84);
+}
+
+.pocket-tic-tac-toe__rail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: 0 .1rem .15rem;
+}
+
+.pocket-tic-tac-toe__rail-title,
+.pocket-tic-tac-toe__spectator-heading {
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.pocket-tic-tac-toe__rail-count {
+  min-width: 2rem;
+  padding: .22rem .45rem;
+  border-radius: 999px;
+  color: var(--pa-muted);
+  background: rgba(255, 255, 255, .07);
+  font-size: .62rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pocket-tic-tac-toe__player-card,
+.pocket-tic-tac-toe__spectator-card {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: .55rem;
+}
+
+.pocket-tic-tac-toe__player-card {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 62px;
+  padding: .55rem;
+  border: 1px solid var(--pa-line);
+  border-radius: var(--pa-radius-card);
+  background: var(--pa-panel-raised);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+
+.pocket-tic-tac-toe__player-card.seat-1 {
+  border-color: rgba(239, 93, 103, .46);
+  background: linear-gradient(135deg, rgba(239, 93, 103, .16), rgba(44, 37, 72, .96));
+}
+
+.pocket-tic-tac-toe__player-card.seat-2 {
+  border-color: rgba(33, 184, 140, .46);
+  background: linear-gradient(135deg, rgba(33, 184, 140, .16), rgba(44, 37, 72, .96));
+}
+
+.pocket-tic-tac-toe__player-card.is-you {
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, .12),
+    0 8px 18px rgba(0, 0, 0, .18);
+}
+
+.pocket-tic-tac-toe__player-card.is-open {
+  border-style: dashed;
+  background: rgba(255, 255, 255, .035);
+}
+
+.pocket-tic-tac-toe__avatar {
+  position: relative;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, .7);
+  border-radius: 999px;
+  color: white;
+  background: var(--pa-seat-1);
+  box-shadow: var(--pa-shadow-piece);
   font-size: .72rem;
   font-weight: 800;
 }
 
-.ttt-seat strong {
-  display: block;
-  margin-top: .2rem;
-  overflow-wrap: anywhere;
+.pocket-tic-tac-toe__player-card.seat-2 .pocket-tic-tac-toe__avatar {
+  background: var(--pa-seat-2);
 }
 
-.ttt-board {
+.pocket-tic-tac-toe__avatar.is-neutral {
+  background: var(--pa-spectator);
+}
+
+.pocket-tic-tac-toe__avatar-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pocket-tic-tac-toe__player-name,
+.pocket-tic-tac-toe__spectator-name {
+  overflow: hidden;
+  font-size: .82rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pocket-tic-tac-toe__mark-badge {
   display: grid;
-  width: min(100%, 21rem);
-  margin: 0 auto;
-  grid-template-columns: repeat(3, 1fr);
-  gap: .45rem;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 10px;
+  color: white;
+  background: var(--pa-seat-1-dark);
+  font-size: .78rem;
+  font-weight: 900;
 }
 
-.ttt-cell {
-  aspect-ratio: 1;
+.pocket-tic-tac-toe__player-card.seat-2 .pocket-tic-tac-toe__mark-badge {
+  background: var(--pa-seat-2-dark);
+}
+
+.pocket-tic-tac-toe__spectator-heading {
+  margin-top: .2rem;
+  color: var(--pa-muted);
+}
+
+.pocket-tic-tac-toe__spectator-card {
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 48px;
+  padding: .42rem .5rem;
+  border: 1px solid rgba(127, 122, 141, .45);
+  border-radius: 14px;
+  background: rgba(91, 86, 104, .26);
+}
+
+.pocket-tic-tac-toe__spectator-card .pocket-tic-tac-toe__avatar {
+  width: 32px;
+  height: 32px;
+  border-color: rgba(255, 255, 255, .42);
+}
+
+.pocket-tic-tac-toe__play-column {
+  display: grid;
+  min-width: 0;
   min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: .65rem;
+}
+
+.pocket-tic-tac-toe__arena {
+  position: relative;
+  display: grid;
+  min-height: 19rem;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--pa-line);
+  border-radius: var(--pa-radius-panel);
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, .08), transparent 20rem),
+    rgba(33, 28, 56, .78);
+}
+
+.pocket-tic-tac-toe__board {
+  display: grid;
+  width: clamp(15rem, 45vmin, 29rem);
+  max-width: calc(100% - 1.25rem);
+  aspect-ratio: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: clamp(.35rem, 1.2vmin, .7rem);
+  padding: clamp(.55rem, 1.8vmin, .9rem);
+  border: clamp(4px, 1vmin, 7px) solid var(--pa-board-edge);
+  border-radius: clamp(22px, 4vmin, 34px);
+  background: var(--pa-board);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .9),
+    inset 0 -8px 16px rgba(118, 91, 54, .08),
+    0 20px 34px rgba(0, 0, 0, .25);
+}
+
+.pocket-tic-tac-toe__cell {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  place-items: center;
+  contain: layout paint;
   padding: 0;
-  border-radius: .85rem;
-  color: #f8f6ff;
-  background: rgba(12, 9, 29, .58);
-  font-size: clamp(2rem, 12vw, 4rem);
-  line-height: 1;
-}
-
-.ttt-cell:not(:disabled):hover {
-  border-color: #8c7cff;
-  background: rgba(140, 124, 255, .18);
-}
-
-.ttt-cell:disabled {
+  overflow: hidden;
+  border: 2px solid #d8cdbd;
+  border-radius: clamp(13px, 2.7vmin, 22px);
+  color: #211c38;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, .95), rgba(237, 226, 208, .9));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .95),
+    inset 0 -6px 0 rgba(179, 157, 126, .15),
+    0 5px 10px rgba(91, 73, 48, .13);
   cursor: default;
+  transition:
+    transform 150ms cubic-bezier(.2, .82, .2, 1),
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.pocket-tic-tac-toe__cell.is-legal {
+  cursor: pointer;
+  border-color: rgba(245, 184, 61, .9);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .95),
+    inset 0 -6px 0 rgba(179, 157, 126, .15),
+    0 0 0 3px rgba(245, 184, 61, .18),
+    0 8px 16px rgba(91, 73, 48, .18);
+}
+
+.pocket-tic-tac-toe__cell.is-legal:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(145deg, #fffefb, #fff3c8);
+}
+
+.pocket-tic-tac-toe__cell.is-legal:active {
+  transform: translateY(2px) scale(.98);
+}
+
+.pocket-tic-tac-toe__cell:disabled {
   opacity: 1;
 }
 
-.ttt-status {
-  min-height: 1.5em;
-  margin: 0;
-  color: #d9d4e9;
-  text-align: center;
+.pocket-tic-tac-toe__cell.is-winning {
+  border-color: rgba(245, 184, 61, .95);
+  background: linear-gradient(145deg, #fffdf7, #ffefaa);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, .45),
+    0 0 0 4px rgba(245, 184, 61, .25),
+    0 12px 20px rgba(142, 94, 15, .23);
 }
 
-.ttt-actions {
+.pocket-tic-tac-toe__mark {
+  position: absolute;
+  inset: 21%;
+  display: block;
+  width: auto;
+  height: auto;
+  box-sizing: border-box;
+  aspect-ratio: 1;
+  filter: drop-shadow(0 5px 5px rgba(0, 0, 0, .2));
+}
+
+.pocket-tic-tac-toe__mark.is-x::before,
+.pocket-tic-tac-toe__mark.is-x::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 105%;
+  height: clamp(7px, 1.7vmin, 13px);
+  border: 2px solid var(--pa-seat-1-dark);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff8990, var(--pa-seat-1));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .42);
+  content: "";
+}
+
+.pocket-tic-tac-toe__mark.is-x::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.pocket-tic-tac-toe__mark.is-x::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.pocket-tic-tac-toe__mark.is-o {
+  border: clamp(8px, 2vmin, 15px) solid var(--pa-seat-2);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 0 0 2px var(--pa-seat-2-dark),
+    0 0 0 2px var(--pa-seat-2-dark),
+    inset 0 4px 0 rgba(255, 255, 255, .35);
+}
+
+.pocket-tic-tac-toe__arena-overlay,
+.pocket-tic-tac-toe__result-overlay {
+  position: absolute;
+  z-index: 3;
   display: flex;
+  max-width: min(88%, 25rem);
+  flex-direction: column;
+  align-items: center;
+  gap: .55rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 22px;
+  background: rgba(27, 23, 47, .94);
+  box-shadow: var(--pa-shadow-overlay);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px) scale(.97);
+  transition: opacity 220ms ease, transform 220ms cubic-bezier(.2, .82, .2, 1);
+}
+
+.pocket-tic-tac-toe__arena-overlay.is-visible,
+.pocket-tic-tac-toe__result-overlay.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.pocket-tic-tac-toe__overlay-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+}
+
+.pocket-tic-tac-toe__overlay-title,
+.pocket-tic-tac-toe__result-title {
+  font-size: 1.28rem;
+  font-weight: 800;
+}
+
+.pocket-tic-tac-toe__result-symbol {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border: 5px solid var(--pa-gold);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #fff4bc, #d9981e);
+  box-shadow: 0 10px 22px rgba(148, 98, 15, .28);
+  transform: rotate(-5deg);
+}
+
+.pocket-tic-tac-toe__result-symbol::before,
+.pocket-tic-tac-toe__result-symbol::after {
+  position: absolute;
+  content: "";
+}
+
+.pocket-tic-tac-toe__result-symbol.is-win::before {
+  top: 15px;
+  left: 13px;
+  width: 30px;
+  height: 24px;
+  border-bottom: 8px solid #6d4811;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  transform: rotate(180deg);
+}
+
+.pocket-tic-tac-toe__result-symbol.is-win::after {
+  bottom: 10px;
+  left: 21px;
+  width: 22px;
+  height: 6px;
+  border-radius: 999px;
+  background: #6d4811;
+}
+
+.pocket-tic-tac-toe__result-symbol.is-draw::before,
+.pocket-tic-tac-toe__result-symbol.is-draw::after {
+  top: 27px;
+  left: 13px;
+  width: 30px;
+  height: 8px;
+  border-radius: 999px;
+  background: #6d4811;
+}
+
+.pocket-tic-tac-toe__result-symbol.is-draw::after {
+  transform: rotate(90deg);
+}
+
+.pocket-tic-tac-toe__result-text {
+  margin: 0;
+  color: var(--pa-muted);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
+.pocket-tic-tac-toe__result-actions {
   flex-wrap: wrap;
   justify-content: center;
-  gap: .55rem;
+  gap: .5rem;
+  margin-top: .15rem;
 }
 
-.ttt-error {
-  min-height: 1.3em;
+.pocket-tic-tac-toe__toast {
+  position: absolute;
+  z-index: 5;
+  right: .75rem;
+  bottom: .75rem;
+  max-width: calc(100% - 1.5rem);
+  padding: .55rem .75rem;
+  border: 1px solid var(--pa-line);
+  border-radius: 13px;
+  color: var(--pa-ink);
+  background: rgba(44, 37, 72, .96);
+  box-shadow: var(--pa-shadow-small);
+  font-size: .72rem;
+  font-weight: 800;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.pocket-tic-tac-toe__toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pocket-tic-tac-toe__toast[data-tone="danger"] {
+  border-color: rgba(239, 93, 103, .72);
+  background: rgba(84, 34, 53, .97);
+}
+
+.pocket-tic-tac-toe__controls {
+  display: grid;
+  min-height: 76px;
+  align-content: center;
+  gap: .12rem;
+  padding: .7rem .85rem;
+  border: 1px solid var(--pa-line);
+  border-radius: var(--pa-radius-panel);
+  background: rgba(33, 28, 56, .9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
+  transition: border-color 220ms ease, background 220ms ease, box-shadow 220ms ease;
+}
+
+.pocket-tic-tac-toe__controls.is-current {
+  border-color: rgba(248, 214, 101, .88);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 244, 188, .34),
+    rgba(166, 122, 18, .28) 35%,
+    rgba(56, 43, 14, .9) 100%
+  );
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 236, 164, .24),
+    inset 0 1px 0 rgba(255, 255, 255, .18),
+    0 0 0 1px rgba(251, 225, 128, .24),
+    0 20px 34px rgba(118, 84, 18, .24);
+}
+
+.pocket-tic-tac-toe__controls.is-warning {
+  border-color: rgba(239, 93, 103, .5);
+}
+
+.pocket-tic-tac-toe__control-kicker {
+  color: var(--pa-gold);
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.pocket-tic-tac-toe__control-title {
+  font-size: .94rem;
+  font-weight: 800;
+}
+
+.pocket-tic-tac-toe__membership {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8rem;
+  padding: .7rem .8rem;
+  border-top: 1px solid var(--pa-line);
+  background: rgba(21, 18, 38, .9);
+}
+
+.pocket-tic-tac-toe__membership-label {
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+.pocket-tic-tac-toe__membership-actions {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: .45rem;
+}
+
+.pocket-tic-tac-toe__button {
+  min-height: 40px;
+  padding: 9px 15px;
+  border-radius: var(--pa-radius-control);
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 150ms cubic-bezier(.2, .82, .2, 1), box-shadow 150ms ease;
+}
+
+.pocket-tic-tac-toe__button--primary {
+  border: 1px solid rgba(255, 255, 255, .18);
+  color: white;
+  background: linear-gradient(135deg, #8067ed, #b153a4);
+  box-shadow: 0 8px 20px rgba(87, 60, 167, .28);
+}
+
+.pocket-tic-tac-toe__button--secondary {
+  border: 1px solid var(--pa-line);
+  color: var(--pa-ink);
+  background: rgba(255, 255, 255, .07);
+}
+
+.pocket-tic-tac-toe__button:not(:disabled):active,
+.pocket-tic-tac-toe__icon-button:not(:disabled):active {
+  transform: translateY(2px) scale(.98);
+}
+
+.pocket-tic-tac-toe__button:disabled,
+.pocket-tic-tac-toe__icon-button:disabled {
+  cursor: default;
+  box-shadow: none;
+}
+
+.pocket-tic-tac-toe__error {
+  min-height: 0;
   margin: 0;
-  color: #ff9bb2;
+  padding: 0 .8rem .35rem;
+  color: #ffabb8;
+  font-size: .72rem;
+  font-weight: 700;
   text-align: center;
+}
+
+@media (max-width: 760px) {
+  .pocket-tic-tac-toe__main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .pocket-tic-tac-toe__player-rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: .5rem;
+    border-radius: 18px;
+  }
+
+  .pocket-tic-tac-toe__rail-heading,
+  .pocket-tic-tac-toe__spectator-heading {
+    grid-column: 1 / -1;
+  }
+
+  .pocket-tic-tac-toe__player-card {
+    min-height: 54px;
+    padding: .42rem;
+  }
+
+  .pocket-tic-tac-toe__player-state {
+    display: none;
+  }
+
+  .pocket-tic-tac-toe__avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .pocket-tic-tac-toe__mark-badge {
+    width: 25px;
+    height: 25px;
+  }
+
+  .pocket-tic-tac-toe__spectator-card {
+    min-height: 42px;
+  }
+
+  .pocket-tic-tac-toe__arena {
+    min-height: 17.5rem;
+  }
+
+  .pocket-tic-tac-toe__board {
+    width: clamp(14.5rem, 67vmin, 25rem);
+  }
+}
+
+@media (max-width: 530px) {
+  .pocket-tic-tac-toe__connection-text,
+  .pocket-tic-tac-toe__subtitle {
+    display: none;
+  }
+
+  .pocket-tic-tac-toe__connection {
+    min-width: 38px;
+    justify-content: center;
+    padding: .4rem;
+  }
+
+  .pocket-tic-tac-toe__main {
+    gap: .5rem;
+    padding: .55rem;
+  }
+
+  .pocket-tic-tac-toe__player-rail {
+    gap: .35rem;
+  }
+
+  .pocket-tic-tac-toe__player-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .pocket-tic-tac-toe__mark-badge {
+    display: none;
+  }
+
+  .pocket-tic-tac-toe__play-column {
+    gap: .5rem;
+  }
+
+  .pocket-tic-tac-toe__controls {
+    min-height: 68px;
+  }
+
+  .pocket-tic-tac-toe__membership {
+    align-items: stretch;
+    flex-direction: column;
+    gap: .55rem;
+  }
+
+  .pocket-tic-tac-toe__membership-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pocket-tic-tac-toe__membership-actions.has-one-action .pocket-tic-tac-toe__button {
+    grid-column: 1 / -1;
+  }
+
+  .pocket-tic-tac-toe__button {
+    width: 100%;
+    padding-inline: .7rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .pocket-tic-tac-toe__topbar {
+    padding: .5rem .55rem;
+  }
+
+  .pocket-tic-tac-toe__brand-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .pocket-tic-tac-toe__icon-button {
+    padding-inline: .5rem;
+    font-size: .64rem;
+  }
+
+  .pocket-tic-tac-toe__player-name {
+    font-size: .75rem;
+  }
+
+  .pocket-tic-tac-toe__arena {
+    min-height: 16rem;
+  }
+
+  .pocket-tic-tac-toe__board {
+    width: min(100%, 15.75rem);
+  }
+
+  .pocket-tic-tac-toe__control-text {
+    display: none;
+  }
+
+  .pocket-tic-tac-toe__controls {
+    min-height: 58px;
+  }
+}
+
+
+@media (max-width: 530px) {
+  .pocket-tic-tac-toe__splash {
+    min-height: 0;
+    justify-content: flex-start;
+    gap: .55rem;
+    padding: .55rem;
+  }
+
+  .pocket-tic-tac-toe__splash-visual {
+    border-radius: 18px;
+  }
+
+  .pocket-tic-tac-toe__splash-panel {
+    align-items: stretch;
+    flex-direction: column;
+    gap: .65rem;
+    padding: .7rem;
+    border-radius: 18px;
+  }
+
+  .pocket-tic-tac-toe__splash-details {
+    align-items: center;
+    text-align: center;
+  }
+
+  .pocket-tic-tac-toe__splash-chips {
+    justify-content: center;
+  }
+
+  .pocket-tic-tac-toe__splash-join {
+    width: 100%;
+  }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .pocket-tic-tac-toe__splash {
+    min-height: 0;
+    flex-direction: row;
+    align-items: stretch;
+    gap: .65rem;
+    padding: .6rem;
+  }
+
+  .pocket-tic-tac-toe__splash-visual {
+    width: min(70%, 37rem);
+    align-self: center;
+    border-radius: 18px;
+  }
+
+  .pocket-tic-tac-toe__splash-panel {
+    width: min(30%, 17rem);
+    align-items: stretch;
+    justify-content: center;
+    flex-direction: column;
+    gap: .7rem;
+    border-radius: 18px;
+  }
+
+  .pocket-tic-tac-toe__splash-details {
+    align-items: center;
+    text-align: center;
+  }
+
+  .pocket-tic-tac-toe__splash-chips {
+    justify-content: center;
+  }
+
+  .pocket-tic-tac-toe__splash-join {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pocket-tic-tac-toe__cell,
+  .pocket-tic-tac-toe__arena-overlay,
+  .pocket-tic-tac-toe__result-overlay,
+  .pocket-tic-tac-toe__toast,
+  .pocket-tic-tac-toe__button,
+  .pocket-tic-tac-toe__controls {
+    scroll-behavior: auto;
+    transition-duration: 1ms;
+  }
+}
+
+.pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__icon-button {
+  display: none;
+}
+
+
+/* v1.2.2: keep status beside the game name and fit the real visible viewport. */
+.pocket-tic-tac-toe__brand .pocket-tic-tac-toe__connection {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: .34rem .55rem;
+}
+
+.pocket-tic-tac-toe__board {
+  width: min(var(--pa-board-size, 29rem), calc(100% - 1.25rem));
+  height: min(var(--pa-board-size, 29rem), calc(100% - 1.25rem));
+  max-width: none;
+  flex: 0 0 auto;
+}
+
+.pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__game-view,
+.pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__main,
+.pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__play-column,
+.pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__arena {
+  min-height: 0;
+}
+
+.pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__main {
+  overflow: hidden;
+}
+
+.pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__topbar {
+  padding-top: max(.5rem, env(safe-area-inset-top));
+}
+
+.pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__membership {
+  padding-bottom: max(.55rem, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 530px) {
+  .pocket-tic-tac-toe__connection-text {
+    display: inline;
+  }
+
+  .pocket-tic-tac-toe__subtitle {
+    display: none;
+  }
+
+  .pocket-tic-tac-toe__brand .pocket-tic-tac-toe__connection {
+    min-width: 0;
+    min-height: 30px;
+    justify-content: flex-start;
+    padding: .3rem .46rem;
+    font-size: .64rem;
+  }
+}
+
+@media (max-height: 720px) {
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__topbar {
+    min-height: 48px;
+    padding-block: .42rem;
+  }
+
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__main {
+    gap: .45rem;
+    padding: .45rem;
+  }
+
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__player-rail {
+    gap: .3rem;
+    padding: .4rem;
+  }
+
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__player-card {
+    min-height: 46px;
+    padding: .35rem;
+  }
+
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__controls {
+    min-height: 58px;
+    padding: .5rem .7rem;
+  }
+
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__membership {
+    gap: .5rem;
+    padding-top: .5rem;
+    padding-inline: .65rem;
+  }
+}
+
+@media (max-height: 560px) and (orientation: landscape) {
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__main {
+    grid-template-columns: minmax(128px, 170px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__player-rail {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__player-state,
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__rail-heading,
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__spectator-heading {
+    display: none;
+  }
+
+  .pocket-tic-tac-toe.is-fullscreen .pocket-tic-tac-toe__player-card {
+    min-height: 42px;
+  }
 }

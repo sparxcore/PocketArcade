@@ -4,6 +4,8 @@
   const APP_ID = "pocketracers";
   const assetBase = new URL(".", document.currentScript.src);
   const iconUrl = new URL("../assets/icon.svg", assetBase).href;
+  const startScreenUrl = new URL("../assets/start-screen.jpg", assetBase).href;
+  const APP_VERSION = "1.2.0";
   const LAPS = 5;
   const INPUT_INTERVAL_MS = 75;
   const INPUT_HEARTBEAT_MS = 300;
@@ -79,7 +81,7 @@
     }
   ];
 
-  const SEAT_COLOURS = ["#55d7f2", "#ff7186", "#72df9d", "#b68cff"];
+  const SEAT_COLOURS = ["#ef5d67", "#21b88c", "#f5b83d", "#8067ed"];
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -268,13 +270,29 @@
       topbar.append(brand, status);
 
       const actions = element("div", "pr-actions");
-      const joinButton = button("Join race", "pr-primary");
+      actions.setAttribute("aria-label", "Match actions");
+      const joinButton = button("Join race", "pr-primary pr-join-button");
       const lobbyReadyButton = button("Ready to choose", "pr-primary");
       const readyButton = button("Ready to race", "pr-primary");
-      const claimButton = button("Claim controls", "");
+      const claimButton = button("Take control", "");
       const leaveButton = button("Leave", "pr-danger");
       const againButton = button("Race again", "pr-primary");
-      actions.append(joinButton, lobbyReadyButton, readyButton, claimButton, leaveButton, againButton);
+      actions.append(lobbyReadyButton, readyButton, claimButton, leaveButton, againButton);
+
+      const splash = element("section", "pr-splash");
+      const splashImage = document.createElement("img");
+      splashImage.className = "pr-splash-art";
+      splashImage.src = startScreenUrl;
+      splashImage.alt = "PocketRacers neon circuit with three arcade racing cars";
+      splashImage.decoding = "async";
+      const splashActions = element("div", "pr-splash-actions");
+      const splashMeta = element("div", "pr-splash-meta");
+      splashMeta.append(
+        element("span", "pr-meta-chip", `v${APP_VERSION}`),
+        element("span", "pr-meta-chip", "2–4 players")
+      );
+      splashActions.append(splashMeta, joinButton);
+      splash.append(splashImage, splashActions);
 
       const selection = element("section", "pr-selection");
       const joinSection = element("div", "pr-selection-group pr-join-stage");
@@ -302,9 +320,11 @@
       selection.append(joinSection, carSection, trackSection, confirmSection);
 
       const lobbyPlayersPanel = element("section", "pr-lobby-players");
-      lobbyPlayersPanel.append(element("h2", "pr-section-title", "Current racers"));
+      lobbyPlayersPanel.append(element("h2", "pr-section-title", "Starting grid"));
       const playersList = element("div", "pr-players");
       lobbyPlayersPanel.append(playersList);
+      const lobbyLayout = element("div", "pr-lobby-layout");
+      lobbyLayout.append(lobbyPlayersPanel, selection);
 
       const raceLayout = element("div", "pr-race-layout");
       const stage = element("div", "pr-stage");
@@ -318,7 +338,8 @@
       const countdownText = element("div", "pr-countdown", "");
       overlay.append(positionText, lapText, speedText, trackNameText, countdownText);
       const standings = element("div", "pr-race-standings");
-      stage.append(canvas, overlay, standings);
+      const raceSpectators = element("div", "pr-race-spectators");
+      stage.append(canvas, overlay, standings, raceSpectators);
       raceLayout.append(stage);
 
       const controls = element("div", "pr-controls");
@@ -337,7 +358,7 @@
         "pr-help",
         "Keyboard: arrows or A/D steer, W/Up accelerates, S/Down brakes. One controller tab drives each profile."
       );
-      root.append(topbar, actions, selection, lobbyPlayersPanel, raceLayout, controls, help);
+      root.append(splash, topbar, lobbyLayout, raceLayout, controls, actions, help);
       container.replaceChildren(root);
 
       const carButtons = [];
@@ -596,13 +617,35 @@
       function renderPlayers() {
         playersList.replaceChildren();
         const gameCars = cars();
-        const seats = matchState?.seats || [];
         const phase = payload()?.phase || "join";
+        const localSeat = ownSeat();
+        const seats = [...(matchState?.seats || [])].sort((a, b) => {
+          if (a.seat === localSeat) return -1;
+          if (b.seat === localSeat) return 1;
+          return a.seat - b.seat;
+        });
+
         for (const seat of seats) {
-          if (!seat.player) continue;
+          const seatColour = SEAT_COLOURS[(seat.seat - 1) % SEAT_COLOURS.length];
+          if (!seat.player) {
+            if (matchState?.state !== "waiting") continue;
+            const item = element("div", "pr-player is-open");
+            item.style.setProperty("--seat-colour", seatColour);
+            const openAvatar = element("div", "pr-avatar pr-avatar-open", String(seat.seat));
+            const info = element("div", "pr-player-info");
+            info.append(
+              element("div", "pr-player-name", "Open Seat"),
+              element("div", "pr-player-meta", "Waiting for racer")
+            );
+            item.append(openAvatar, info);
+            playersList.append(item);
+            continue;
+          }
+
           const car = gameCars.find((entry) => entry.seat === seat.seat);
           const item = element("div", "pr-player");
-          if (seat.seat === ownSeat()) item.dataset.self = "true";
+          item.style.setProperty("--seat-colour", seatColour);
+          if (seat.seat === localSeat) item.dataset.self = "true";
           item.append(createAvatar(seat.player, seat.seat, arcade.profile));
           const info = element("div", "pr-player-info");
           const name = element("div", "pr-player-name", profileName(seat.player, seat.seat));
@@ -610,7 +653,7 @@
           if (phase === "join") {
             meta = car?.lobbyReady ? "Ready to choose ✓" : "Waiting to choose";
           } else if (phase === "car-select") {
-            if (seat.seat === ownSeat() && car?.carSelected) {
+            if (seat.seat === localSeat && car?.carSelected) {
               meta = `Selected ${CARS[(car.car || 1) - 1]?.name || "a car"}`;
             } else {
               meta = car?.carSelected ? "Car selected ✓" : "Choosing car…";
@@ -629,13 +672,33 @@
           }
           info.append(name, element("div", "pr-player-meta", meta));
           const chip = element("span", "pr-seat-chip", String(seat.seat));
-          chip.style.setProperty("--seat-colour", SEAT_COLOURS[(seat.seat - 1) % SEAT_COLOURS.length]);
           item.append(info, chip);
           playersList.append(item);
         }
+
+        for (const spectator of matchState?.spectators || []) {
+          const item = element("div", "pr-player is-spectator");
+          item.append(createAvatar(spectator, "S", arcade.profile));
+          const info = element("div", "pr-player-info");
+          info.append(element("div", "pr-player-name", profileName(spectator, "S")));
+          item.append(info);
+          playersList.append(item);
+        }
+
         if (!playersList.children.length) {
           playersList.append(element("div", "pr-player-meta", "Waiting for racers…"));
         }
+      }
+
+      function renderRaceSpectators() {
+        raceSpectators.replaceChildren();
+        for (const spectator of matchState?.spectators || []) {
+          const pill = element("div", "pr-spectator-pill");
+          pill.append(createAvatar(spectator, "S", arcade.profile));
+          pill.append(element("span", "pr-spectator-name", profileName(spectator, "S")));
+          raceSpectators.append(pill);
+        }
+        raceSpectators.classList.toggle("pr-hidden", !raceSpectators.children.length);
       }
 
       function renderStandings() {
@@ -726,7 +789,16 @@
           (phase === "countdown" || phase === "racing"));
 
         syncFullscreen(racePresentation);
-        joinButton.classList.toggle("pr-hidden", Boolean(matchState));
+        root.classList.toggle("is-start", !matchState);
+        root.classList.toggle("is-lobby", Boolean(matchState && !racePresentation && !finished));
+        root.classList.toggle("is-race-presentation", racePresentation);
+        root.classList.toggle("is-finished", finished);
+        root.classList.toggle("is-spectator", role === "spectator");
+        splash.classList.toggle("pr-hidden", Boolean(matchState));
+        topbar.classList.toggle("pr-hidden", !matchState || racePresentation);
+        actions.classList.toggle("pr-hidden", !matchState || racePresentation);
+        joinButton.disabled = joinPending || arcade.connectionStatus !== "connected";
+        joinButton.textContent = joinPending ? "Joining…" : "Join race";
         lobbyReadyButton.classList.toggle("pr-hidden", !matchState || role !== "player" ||
           platformState !== "waiting" || phase !== "join");
         readyButton.classList.toggle("pr-hidden", !matchState || role !== "player" ||
@@ -734,12 +806,14 @@
         claimButton.classList.toggle("pr-hidden", !matchState || role !== "player" || controller || finished);
         leaveButton.classList.toggle("pr-hidden", !matchState || finished);
         againButton.classList.toggle("pr-hidden", !finished);
+        lobbyLayout.classList.toggle("pr-hidden", !matchState || racePresentation || finished);
         selection.classList.toggle("pr-hidden", !matchState || role !== "player" || platformState !== "waiting");
         lobbyPlayersPanel.classList.toggle("pr-hidden", !matchState || racePresentation || finished);
         raceLayout.classList.toggle("pr-hidden", !racePresentation && !finished);
         controls.classList.toggle("pr-hidden", !shouldShowControls());
-        help.classList.toggle("pr-hidden", racePresentation);
+        help.classList.toggle("pr-hidden", !matchState || racePresentation || finished);
         const drivingEnabled = canDrive();
+        root.classList.toggle("can-drive", drivingEnabled);
         throttleButton.disabled = !drivingEnabled;
         brakeButton.disabled = !drivingEnabled;
         leftButton.disabled = !drivingEnabled;
@@ -800,6 +874,7 @@
         renderSelection();
         renderPlayers();
         renderStandings();
+        renderRaceSpectators();
       }
 
       function resizeCanvas() {

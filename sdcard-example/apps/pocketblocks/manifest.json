@@ -2,8 +2,8 @@
   "manifestVersion": 2,
   "id": "pocketblocks",
   "name": "PocketBlocks",
-  "description": "A two-to-four-player falling-block battle with shared garbage attacks.",
-  "version": "2.1.0",
+  "description": "A two-to-four-player PocketArcade falling-block battle with shared garbage attacks.",
+  "version": "2.6.0",
   "minPlatformVersion": "0.3.0",
   "kind": "game",
   "client": {
@@ -14,7 +14,7 @@
     "type": "lua",
     "entrypoint": "server/main.lua",
     "mode": "tick",
-    "tickRateHz": 20
+    "tickRateHz": 15
   },
   "multiplayer": {
     "minPlayers": 2,

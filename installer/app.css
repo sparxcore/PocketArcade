@@ -44,8 +44,13 @@ main {
   margin-bottom: 3rem;
 }
 
+.hero-beta {
+  margin-left: clamp(-2.5rem, -4vw, -1.25rem);
+}
+
 .hero-logo {
   display: block;
+  transform: translateX(-8%);
   width: min(100%, 40rem);
   height: auto;
   margin: 0 0 clamp(1.5rem, 5vw, 2.5rem);
