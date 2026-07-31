@@ -50,17 +50,8 @@ local function new_board()
     return board
 end
 
-local function platform_players_by_id()
-    local by_id = {}
-    local players = match.players()
-    for i = 1, #players do
-        by_id[players[i].profileId] = players[i]
-    end
-    return by_id, players
-end
-
-local function find_platform_player(profile_id)
-    local players = match.players()
+local function find_platform_player(profile_id, platform_players)
+    local players = platform_players or match.players()
     for i = 1, #players do
         if players[i].profileId == profile_id then
             return players[i]
@@ -97,11 +88,11 @@ local function next_piece(context, player)
     return piece
 end
 
-local function prune_sequence(context)
+local function prune_sequence(context, platform_players)
     local minimum_index = false
-    local platform_players = match.players()
-    for i = 1, #platform_players do
-        local player = context.players[platform_players[i].profileId]
+    local players = platform_players or match.players()
+    for i = 1, #players do
+        local player = context.players[players[i].profileId]
         if player and player.alive and player.pieceIndex and
            (not minimum_index or player.pieceIndex < minimum_index) then
             minimum_index = player.pieceIndex
@@ -202,16 +193,25 @@ local function reset_player(context, platform_player)
     return player
 end
 
-local function alive_players(context)
-    local result = {}
-    local platform_players = match.players()
-    for i = 1, #platform_players do
-        local player = context.players[platform_players[i].profileId]
-        if player and player.alive then
-            result[#result + 1] = player
+local function alive_players(context, platform_players, result)
+    local output = result or {}
+    for i = #output, 1, -1 do
+        output[i] = nil
+    end
+    local players = platform_players or match.players()
+    for i = 1, #players do
+        local current = players[i]
+        local player = context.players[current.profileId]
+        if player then
+            player.seat = current.seat
+            player.nickname = current.nickname
+            player.connected = current.connected
+            if player.alive then
+                output[#output + 1] = player
+            end
         end
     end
-    return result
+    return output
 end
 
 local function move_piece(player, dx, dy)
@@ -321,15 +321,15 @@ local function enqueue_garbage(player, count, hole)
     player.pendingGarbage = player.pendingGarbage + accepted
 end
 
-local function send_attack_to_others(context, attacker, count)
+local function send_attack_to_others(context, attacker, count, platform_players)
     if count <= 0 then
         return
     end
     local hole = random.next() % BOARD_W
-    local players = alive_players(context)
+    local players = platform_players or match.players()
     for i = 1, #players do
-        local target = players[i]
-        if target.profileId ~= attacker.profileId then
+        local target = context.players[players[i].profileId]
+        if target and target.alive and target.profileId ~= attacker.profileId then
             enqueue_garbage(target, count, hole)
         end
     end
@@ -350,7 +350,7 @@ local function apply_pending_garbage(context, player)
     end
 end
 
-local function lock_piece(context, player)
+local function lock_piece(context, player, platform_players)
     if not player.active or not player.alive then
         return
     end
@@ -373,7 +373,7 @@ local function lock_piece(context, player)
     -- A clear attacks only when it removes more than two rows. Every other
     -- surviving player receives cleared-minus-one garbage rows.
     if cleared > 2 then
-        send_attack_to_others(context, player, cleared - 1)
+        send_attack_to_others(context, player, cleared - 1, platform_players)
     end
 
     if player.pendingGarbage > 0 then
@@ -383,17 +383,17 @@ local function lock_piece(context, player)
     if player.alive then
         spawn_piece(context, player)
     end
-    prune_sequence(context)
+    prune_sequence(context, platform_players)
     context.dirty = true
 end
 
-local function hard_drop(context, player)
+local function hard_drop(context, player, platform_players)
     local distance = 0
     while move_piece(player, 0, 1) do
         distance = distance + 1
     end
     player.score = player.score + distance * 2
-    lock_piece(context, player)
+    lock_piece(context, player, platform_players)
 end
 
 local function gravity_interval(player)
@@ -407,6 +407,11 @@ end
 
 local function player_snapshot(player, platform_player)
     local active = false
+    local cells = ""
+    local preview = {}
+    if player.board then
+        cells = pack_board(player)
+    end
     if player.active and player.alive then
         active = {
             type = player.active.type,
@@ -415,31 +420,37 @@ local function player_snapshot(player, platform_player)
             y = player.active.y - HIDDEN_H
         }
     end
+    if player.next then
+        for i = 1, math.min(3, #player.next) do
+            preview[i] = player.next[i]
+        end
+    end
     return {
         profileId = player.profileId,
         nickname = platform_player.nickname,
         seat = platform_player.seat,
         connected = platform_player.connected,
         alive = player.alive,
-        score = player.score,
-        lines = player.lines,
-        pendingGarbage = player.pendingGarbage,
-        cells = pack_board(player),
+        score = player.score or 0,
+        lines = player.lines or 0,
+        pendingGarbage = player.pendingGarbage or 0,
+        cells = cells,
         active = active,
-        next = {player.next[1], player.next[2], player.next[3]}
+        next = preview
     }
 end
 
-local function snapshot(context)
+local function snapshot(context, platform_players)
     local players = {}
-    local platform_players = match.players()
-    for i = 1, #platform_players do
-        local player = context.players[platform_players[i].profileId]
+    local current_players = platform_players or match.players()
+    for i = 1, #current_players do
+        local current = current_players[i]
+        local player = context.players[current.profileId]
         if player then
-            player.seat = platform_players[i].seat
-            player.nickname = platform_players[i].nickname
-            player.connected = platform_players[i].connected
-            players[#players + 1] = player_snapshot(player, platform_players[i])
+            player.seat = current.seat
+            player.nickname = current.nickname
+            player.connected = current.connected
+            players[#players + 1] = player_snapshot(player, current)
         end
     end
     return {
@@ -449,29 +460,35 @@ local function snapshot(context)
     }
 end
 
-local function start_round(context)
+local function start_round(context, platform_players)
+    local current_players = platform_players or match.players()
+    if #current_players < 2 or match.state() ~= "playing" then
+        return false
+    end
+
     context.sequence = {}
     context.sequenceBase = 1
     context.bag = {}
     context.bagIndex = 8
     context.eliminationCounter = 0
     local round_players = {}
-    local platform_players = match.players()
-    for i = 1, #platform_players do
-        local player = reset_player(context, platform_players[i])
-        round_players[platform_players[i].profileId] = player
+    for i = 1, #current_players do
+        local current = current_players[i]
+        local player = reset_player(context, current)
+        round_players[current.profileId] = player
     end
     context.players = round_players
     context.phase = "countdown"
     context.countdownMs = COUNTDOWN_MS
     context.dirty = true
+    return true
 end
 
-local function sorted_finish_players(context)
+local function sorted_finish_players(context, platform_players)
     local entries = {}
-    local platform_players = match.players()
-    for i = 1, #platform_players do
-        local game_player = context.players[platform_players[i].profileId]
+    local current_players = platform_players or match.players()
+    for i = 1, #current_players do
+        local game_player = context.players[current_players[i].profileId]
         if game_player then
             entries[#entries + 1] = game_player
         end
@@ -494,17 +511,27 @@ local function sorted_finish_players(context)
     return entries
 end
 
-local function finish_match(context)
-    if context.finishing then
+local function finish_match(context, platform_players)
+    if context.finishing or match.state() ~= "playing" then
         return
     end
+
+    local occupied = platform_players or match.players()
+    if #occupied < 2 then
+        return
+    end
+    local ranked = sorted_finish_players(context, occupied)
+    if #ranked ~= #occupied then
+        log.info("finish deferred: player state mismatch")
+        return
+    end
+
     context.finishing = true
     context.phase = "finished"
     context.countdownMs = 0
     context.dirty = true
-    transport.broadcast_snapshot(snapshot(context))
+    transport.broadcast_snapshot(snapshot(context, occupied))
 
-    local ranked = sorted_finish_players(context)
     local placements = {}
     for i = 1, #ranked do
         placements[i] = {seat = ranked[i].seat, place = i}
@@ -512,21 +539,21 @@ local function finish_match(context)
     match.finish({draw = false, placements = placements})
 end
 
-local function check_finished(context)
-    if context.phase ~= "playing" then
+local function check_finished(context, platform_players)
+    if context.phase ~= "playing" or match.state() ~= "playing" then
         return false
     end
-    local occupied = match.players()
-    local alive = alive_players(context)
-    if #occupied > 0 and #alive <= 1 then
-        finish_match(context)
-        return true
+    local occupied = platform_players or match.players()
+    local alive = alive_players(context, occupied, context.aliveScratch)
+    if #occupied >= 2 and #alive <= 1 then
+        finish_match(context, occupied)
+        return context.finishing
     end
     return false
 end
 
-local function ensure_player(context, player_info)
-    local platform_player = find_platform_player(player_info.profileId)
+local function ensure_player(context, player_info, platform_players)
+    local platform_player = find_platform_player(player_info.profileId, platform_players)
     if not platform_player then
         return nil
     end
@@ -537,9 +564,9 @@ local function ensure_player(context, player_info)
             seat = platform_player.seat,
             nickname = platform_player.nickname,
             connected = platform_player.connected,
-            board = new_board(),
+            board = nil,
             active = nil,
-            next = {1, 2, 3},
+            next = {},
             pieceIndex = 1,
             score = 0,
             lines = 0,
@@ -559,28 +586,30 @@ local function ensure_player(context, player_info)
     return player
 end
 
-local function reset_to_waiting(context)
+local function reset_to_waiting(context, platform_players)
     local retained = {}
-    local platform_players = match.players()
-    for i = 1, #platform_players do
-        local platform_player = platform_players[i]
-        local player = ensure_player(context, platform_player)
-        for row = 1, BOARD_H do
-            player.board[row] = EMPTY_ROW
+    local current_players = platform_players or match.players()
+    for i = 1, #current_players do
+        local platform_player = current_players[i]
+        local player = ensure_player(context, platform_player, current_players)
+        if player then
+            -- Waiting rooms retain identity only. Boards and piece queues are
+            -- created once, after the platform has accepted every ready player.
+            player.board = nil
+            player.active = nil
+            player.next = {}
+            player.pieceIndex = 1
+            player.score = 0
+            player.lines = 0
+            player.pendingGarbage = 0
+            player.garbageBatches = {}
+            player.gravityMs = 0
+            player.lastRotateMs = -ROTATE_COOLDOWN_MS
+            player.lastHardDropMs = -HARD_DROP_COOLDOWN_MS
+            player.alive = false
+            player.eliminatedAt = 0
+            retained[platform_player.profileId] = player
         end
-        player.active = nil
-        player.next = {}
-        player.pieceIndex = 1
-        player.score = 0
-        player.lines = 0
-        player.pendingGarbage = 0
-        player.garbageBatches = {}
-        player.gravityMs = 0
-        player.lastRotateMs = -ROTATE_COOLDOWN_MS
-        player.lastHardDropMs = -HARD_DROP_COOLDOWN_MS
-        player.alive = false
-        player.eliminatedAt = 0
-        retained[platform_player.profileId] = player
     end
     context.players = retained
     context.sequence = {}
@@ -606,6 +635,7 @@ return {
         context.eliminationCounter = 0
         context.dirty = true
         context.finishing = false
+        context.aliveScratch = {}
     end,
 
     on_match_open = function(context)
@@ -614,28 +644,40 @@ return {
     end,
 
     on_player_join = function(context, player_info)
-        ensure_player(context, player_info)
-        context.dirty = true
+        local platform_players = match.players()
+        if match.state() == "waiting" then
+            reset_to_waiting(context, platform_players)
+        else
+            ensure_player(context, player_info, platform_players)
+            context.dirty = true
+        end
     end,
 
     on_player_update = function(context, player_info)
-        ensure_player(context, player_info)
-        context.dirty = true
+        local platform_players = match.players()
+        if match.state() == "waiting" then
+            reset_to_waiting(context, platform_players)
+        else
+            ensure_player(context, player_info, platform_players)
+            context.dirty = true
+        end
     end,
 
     on_player_leave = function(context, player_info, reason)
         local player = context.players[player_info.profileId]
-        if player then
-            context.players[player_info.profileId] = nil
-        end
-        if context.phase == "countdown" and match.state() == "waiting" then
-            reset_to_waiting(context)
+        local platform_players = match.players()
+        context.players[player_info.profileId] = nil
+        if match.state() == "waiting" then
+            -- The platform has withdrawn active play because the minimum/ready
+            -- condition is no longer true. Do not call match.finish from waiting;
+            -- rebuild a lightweight lobby and allow a replacement player to join.
+            reset_to_waiting(context, platform_players)
         elseif player then
             context.dirty = true
-            prune_sequence(context)
-            check_finished(context)
+            prune_sequence(context, platform_players)
+            check_finished(context, platform_players)
         end
-        log.info("player left: " .. reason)
+        log.info("player left: " .. tostring(reason or "unknown"))
     end,
 
     on_command = function(context, player_info, action, data, sequence)
@@ -658,6 +700,8 @@ return {
         end
 
         local changed = false
+        local may_finish = false
+        local platform_players = false
         if action == "left" then
             changed = move_piece(player, -1, 0)
         elseif action == "right" then
@@ -671,17 +715,23 @@ return {
                 player.score = player.score + 1
                 changed = true
             else
-                lock_piece(context, player)
+                platform_players = match.players()
+                lock_piece(context, player, platform_players)
                 changed = true
+                may_finish = true
             end
         elseif action == "hard-drop" then
-            hard_drop(context, player)
+            platform_players = match.players()
+            hard_drop(context, player, platform_players)
             changed = true
+            may_finish = true
         end
 
         if changed then
             context.dirty = true
-            check_finished(context)
+            if may_finish then
+                check_finished(context, platform_players)
+            end
         end
     end,
 
@@ -693,7 +743,8 @@ return {
         local platform_state = match.state()
 
         if platform_state == "playing" and context.phase == "waiting" then
-            start_round(context)
+            local platform_players = match.players()
+            start_round(context, platform_players)
             return
         end
 
@@ -708,32 +759,31 @@ return {
         end
 
         if context.phase == "playing" then
-            local platform_by_id = platform_players_by_id()
-            local players = alive_players(context)
+            local platform_players = match.players()
+            local players = alive_players(context, platform_players, context.aliveScratch)
             for i = 1, #players do
                 local player = players[i]
-                local current = platform_by_id[player.profileId]
-                player.connected = current and current.connected or false
                 player.gravityMs = player.gravityMs + elapsed
                 local interval = gravity_interval(player)
                 while player.gravityMs >= interval and player.alive do
                     player.gravityMs = player.gravityMs - interval
                     if not move_piece(player, 0, 1) then
-                        lock_piece(context, player)
+                        lock_piece(context, player, platform_players)
                     else
                         context.dirty = true
                     end
                     interval = gravity_interval(player)
                 end
             end
-            if check_finished(context) then
+            if check_finished(context, platform_players) then
                 return
             end
         end
     end,
 
     on_snapshot = function(context, recipient)
-        return snapshot(context)
+        local platform_players = match.players()
+        return snapshot(context, platform_players)
     end,
 
     on_unload = function(context)
@@ -741,5 +791,6 @@ return {
         context.sequence = {}
         context.sequenceBase = 1
         context.bag = {}
+        context.aliveScratch = {}
     end
 }

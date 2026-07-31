@@ -1,0 +1,1310 @@
+.pocket-inferno {
+  --pa-bg: #151226;
+  --pa-panel: #211c38;
+  --pa-panel-raised: #2c2548;
+  --pa-ink: #fffaf2;
+  --pa-muted: #bdb7ce;
+  --pa-line: rgba(255, 255, 255, .11);
+  --pa-danger: #ef5d67;
+  --pa-success: #21b88c;
+  --pa-gold: #f5b83d;
+  --pa-violet: #8067ed;
+  --pa-shadow-small: 0 8px 20px rgba(0, 0, 0, .18);
+  --pa-shadow-panel: 0 16px 30px rgba(0, 0, 0, .24);
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: min(680px, 100dvh);
+  max-height: 100dvh;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 26px;
+  color: var(--pa-ink);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(239, 93, 103, .25), transparent 28rem),
+    radial-gradient(circle at 100% 78%, rgba(245, 184, 61, .15), transparent 26rem),
+    var(--pa-bg);
+  font-family: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+  box-shadow: var(--pa-shadow-panel);
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+.pocket-inferno.is-fullscreen {
+  min-height: 100%;
+  max-height: none;
+  border-radius: 0;
+}
+
+.pocket-inferno *,
+.pocket-inferno *::before,
+.pocket-inferno *::after {
+  box-sizing: border-box;
+}
+
+.pocket-inferno button {
+  font: inherit;
+}
+
+.pocket-inferno button:focus-visible {
+  outline: 3px solid rgba(255, 244, 188, .95);
+  outline-offset: 3px;
+}
+
+.pocket-inferno__topbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  min-height: 58px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--pa-line);
+  background: rgba(20, 16, 35, .89);
+  backdrop-filter: blur(12px);
+}
+
+.pocket-inferno.is-playing .pocket-inferno__topbar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  min-height: 48px;
+  padding-right: 72px;
+  border-bottom-color: rgba(255, 255, 255, .08);
+  background: linear-gradient(to bottom, rgba(15, 11, 27, .82), rgba(15, 11, 27, .14));
+  pointer-events: none;
+}
+
+.pocket-inferno.is-playing .pocket-inferno__top-actions,
+.pocket-inferno.is-playing .pocket-inferno__brand {
+  pointer-events: auto;
+}
+
+.pocket-inferno__brand {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.pocket-inferno__brand-mark {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border: 3px solid #2c1725;
+  border-radius: 11px;
+  background:
+    linear-gradient(135deg, transparent 45%, rgba(255,255,255,.28) 46% 52%, transparent 53%),
+    linear-gradient(135deg, #ef5d67, #f5b83d);
+  box-shadow: inset 0 -5px 0 rgba(66, 25, 40, .3), 0 6px 13px rgba(0,0,0,.24);
+  transform: rotate(-6deg);
+}
+
+.pocket-inferno__brand strong,
+.pocket-inferno__brand small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pocket-inferno__brand strong {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.pocket-inferno__brand small {
+  margin-top: 1px;
+  color: var(--pa-muted);
+  font-size: .66rem;
+  font-weight: 700;
+}
+
+.pocket-inferno.is-playing .pocket-inferno__brand small {
+  display: none;
+}
+
+.pocket-inferno__top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pocket-inferno__connection {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--pa-line);
+  border-radius: 999px;
+  color: var(--pa-muted);
+  background: rgba(255, 255, 255, .06);
+  font-size: .65rem;
+  font-weight: 800;
+}
+
+.pocket-inferno__connection::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pa-gold);
+  content: "";
+}
+
+.pocket-inferno__connection[data-state="connected"]::before {
+  background: var(--pa-success);
+  box-shadow: 0 0 0 4px rgba(33, 184, 140, .16);
+}
+
+.pocket-inferno__connection[data-state="disconnected"]::before {
+  background: var(--pa-danger);
+}
+
+.pocket-inferno__icon-button {
+  display: inline-grid;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--pa-line);
+  border-radius: 12px;
+  color: var(--pa-ink);
+  background: rgba(255, 255, 255, .07);
+  box-shadow: var(--pa-shadow-small);
+  cursor: pointer;
+  font-size: 1.05rem;
+}
+
+.pocket-inferno.is-playing .pocket-inferno__icon-button {
+  display: none;
+}
+
+.pocket-inferno__body {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.pocket-inferno__screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pocket-inferno__screen.is-visible {
+  display: flex;
+}
+
+.pocket-inferno__splash {
+  /* Keep the splash in the same full-area positioning model as every other screen.
+     `position: relative` collapsed this flex item to 0px because all of its children
+     are absolutely positioned, which made the artwork flash before CSS applied and
+     then disappear. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  isolation: isolate;
+  align-items: stretch;
+  overflow: hidden;
+  background: #0b080d;
+}
+
+.pocket-inferno__splash-art {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #0b080d;
+}
+
+.pocket-inferno__splash-art::after {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 0 44%, rgba(7, 4, 8, .12) 56%, rgba(7, 4, 8, .82) 100%),
+    linear-gradient(0deg, rgba(7, 4, 8, .78), transparent 42%);
+  content: "";
+  pointer-events: none;
+}
+
+.pocket-inferno__splash-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  image-rendering: auto;
+}
+
+.pocket-inferno__splash-copy {
+  position: absolute;
+  z-index: 2;
+  right: clamp(18px, 4vw, 46px);
+  bottom: clamp(18px, 4vw, 42px);
+  display: flex;
+  width: min(390px, 42%);
+  min-width: 280px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: clamp(17px, 2.5vw, 25px);
+  border: 1px solid rgba(255, 148, 70, .28);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(40, 16, 15, .93), rgba(13, 9, 17, .95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 218, 154, .12),
+    0 18px 44px rgba(0, 0, 0, .42);
+  backdrop-filter: blur(8px);
+}
+
+.pocket-inferno__pa-logo {
+  width: min(164px, 65%);
+  max-height: 52px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.pocket-inferno__sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.pocket-inferno__kicker {
+  margin: 0;
+  color: #f5cf73;
+  font-size: .65rem;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.pocket-inferno__splash h1,
+.pocket-inferno__lobby h2,
+.pocket-inferno__results h2 {
+  margin: 0;
+  color: var(--pa-ink);
+  font-size: clamp(1.65rem, 4vw, 3.25rem);
+  line-height: .98;
+  letter-spacing: -.04em;
+}
+
+.pocket-inferno__splash-copy > p:not(.pocket-inferno__kicker) {
+  max-width: 32rem;
+  margin: 0;
+  color: #eee5dc;
+  font-size: clamp(.78rem, 1.45vw, .92rem);
+  line-height: 1.45;
+}
+
+.pocket-inferno__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.pocket-inferno__chips span {
+  padding: 6px 9px;
+  border: 1px solid var(--pa-line);
+  border-radius: 999px;
+  color: var(--pa-muted);
+  background: rgba(255,255,255,.06);
+  font-size: .67rem;
+  font-weight: 800;
+}
+
+.pocket-inferno__primary-button,
+.pocket-inferno__primary-button:disabled {
+  cursor: wait;
+  color: #f4dcc5;
+  background: linear-gradient(135deg, #684329, #3b2830);
+  box-shadow: inset 0 0 0 1px rgba(255, 190, 116, .18);
+  transform: none;
+}
+
+.pocket-inferno__splash-copy .pocket-inferno__primary-button:not(:disabled) {
+  background: linear-gradient(135deg, #f47b35, #c52f1e);
+  box-shadow: 0 8px 22px rgba(202, 48, 25, .34), inset 0 1px 0 rgba(255,255,255,.22);
+}
+
+.pocket-inferno__secondary-button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 150ms cubic-bezier(.2,.82,.2,1), box-shadow 150ms ease;
+}
+
+.pocket-inferno__primary-button {
+  border: 1px solid rgba(255,255,255,.16);
+  color: #fff;
+  background: linear-gradient(135deg, #8067ed, #b153a4);
+  box-shadow: 0 8px 20px rgba(87, 60, 167, .28), inset 0 1px 0 rgba(255,255,255,.2);
+}
+
+.pocket-inferno__secondary-button {
+  border: 1px solid var(--pa-line);
+  color: var(--pa-ink);
+  background: rgba(255, 255, 255, .07);
+}
+
+.pocket-inferno__primary-button:active,
+.pocket-inferno__secondary-button:active,
+.pocket-inferno__icon-button:active {
+  transform: translateY(2px);
+}
+
+.pocket-inferno__lobby {
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(18px, 4vh, 32px);
+  padding: clamp(18px, 4vw, 42px);
+  overflow: auto;
+}
+
+.pocket-inferno__lobby-hero {
+  display: flex;
+  max-width: 760px;
+  align-items: center;
+  gap: 18px;
+  margin: 0 auto;
+}
+
+.pocket-inferno__arena-icon {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  flex: 0 0 auto;
+  border: 6px solid #371d31;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #ef5d67, #f5b83d);
+  box-shadow: var(--pa-shadow-panel), inset 0 -12px 0 rgba(87,34,39,.25);
+  transform: rotate(-5deg);
+}
+
+.pocket-inferno__arena-icon::before,
+.pocket-inferno__arena-icon::after {
+  position: absolute;
+  background: #fff4cf;
+  content: "";
+}
+
+.pocket-inferno__arena-icon::before {
+  inset: 17px 29px;
+}
+
+.pocket-inferno__arena-icon::after {
+  inset: 29px 17px;
+}
+
+.pocket-inferno__lobby h2 {
+  margin-top: 4px;
+  font-size: clamp(1.35rem, 3vw, 2.15rem);
+}
+
+.pocket-inferno__lobby-hero p:last-child {
+  margin: 8px 0 0;
+  color: var(--pa-muted);
+  font-size: .82rem;
+}
+
+.pocket-inferno__players-grid {
+  display: grid;
+  width: min(880px, 100%);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 auto;
+}
+
+.pocket-inferno__player-card {
+  --seat-colour: var(--pa-violet);
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 86px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--seat-colour) 42%, transparent);
+  border-radius: 17px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--seat-colour) 15%, #2c2548), rgba(32,27,54,.96));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), var(--pa-shadow-small);
+}
+
+.pocket-inferno__player-card.seat-1 { --seat-colour: #ef5d67; }
+.pocket-inferno__player-card.seat-2 { --seat-colour: #21b88c; }
+.pocket-inferno__player-card.seat-3 { --seat-colour: #f5b83d; }
+.pocket-inferno__player-card.seat-4 { --seat-colour: #8067ed; }
+
+.pocket-inferno__player-card.is-local {
+  border-color: rgba(248, 214, 101, .88);
+  background: linear-gradient(135deg, rgba(255,244,188,.18), rgba(56,43,14,.74));
+  box-shadow: inset 0 0 0 2px rgba(255,236,164,.13), 0 14px 26px rgba(118,84,18,.18);
+}
+
+.pocket-inferno__player-card.is-open {
+  grid-template-columns: auto 1fr;
+  border-style: dashed;
+  border-color: rgba(255,255,255,.15);
+  color: var(--pa-muted);
+  background: rgba(255,255,255,.035);
+  box-shadow: none;
+}
+
+.pocket-inferno__player-card.is-spectator {
+  --seat-colour: #7f7a8d;
+  border-color: rgba(127,122,141,.35);
+  background: rgba(91,86,104,.34);
+}
+
+.pocket-inferno__avatar,
+.pocket-inferno__open-avatar {
+  position: relative;
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 3px solid color-mix(in srgb, var(--seat-colour) 70%, #fff);
+  border-radius: 50%;
+  color: #fff;
+  background: var(--seat-colour);
+  font-size: .72rem;
+  font-weight: 900;
+  box-shadow: inset 0 -5px 0 rgba(0,0,0,.16), 0 6px 12px rgba(0,0,0,.22);
+}
+
+.pocket-inferno__avatar.is-neutral {
+  --seat-colour: #7f7a8d;
+}
+
+.pocket-inferno__avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pocket-inferno__open-avatar {
+  border-color: rgba(255,255,255,.15);
+  color: var(--pa-muted);
+  background: rgba(255,255,255,.05);
+  box-shadow: none;
+  font-size: 1.35rem;
+}
+
+.pocket-inferno__player-details {
+  min-width: 0;
+}
+
+.pocket-inferno__player-details strong,
+.pocket-inferno__player-details small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pocket-inferno__player-details strong,
+.pocket-inferno__player-card > strong {
+  font-size: .82rem;
+  font-weight: 800;
+}
+
+.pocket-inferno__player-details small {
+  margin-top: 4px;
+  color: var(--pa-muted);
+  font-size: .65rem;
+  font-weight: 700;
+}
+
+.pocket-inferno__seat-marker {
+  display: inline-flex;
+  min-width: 26px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--seat-colour);
+  font-size: .58rem;
+  font-weight: 900;
+}
+
+.pocket-inferno__lobby-actions,
+.pocket-inferno__result-actions {
+  display: flex;
+  width: min(660px, 100%);
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 auto;
+}
+
+.pocket-inferno__game {
+  min-height: 0;
+  flex-direction: column;
+  background: #0e0b17;
+}
+
+.pocket-inferno__game-shell {
+  position: relative;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  background: #0e0b17;
+}
+
+.pocket-inferno__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #0e0b17;
+  image-rendering: auto;
+  touch-action: none;
+}
+
+.pocket-inferno__player-rail {
+  position: absolute;
+  z-index: 7;
+  top: 51px;
+  left: 10px;
+  display: flex;
+  max-width: calc(100% - 130px);
+  gap: 6px;
+  pointer-events: none;
+}
+
+.pocket-inferno__player-card.is-compact {
+  min-height: 38px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  padding: 5px 7px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--seat-colour) 28%, rgba(21,18,38,.9));
+  box-shadow: 0 7px 16px rgba(0,0,0,.28);
+}
+
+.pocket-inferno__player-card.is-compact .pocket-inferno__avatar {
+  width: 28px;
+  height: 28px;
+  border-width: 2px;
+  font-size: .52rem;
+}
+
+.pocket-inferno__player-card.is-compact .pocket-inferno__player-details strong,
+.pocket-inferno__player-card.is-compact > strong {
+  font-size: .66rem;
+}
+
+.pocket-inferno__player-card.is-compact .pocket-inferno__player-details small {
+  display: none;
+}
+
+.pocket-inferno__player-card.is-compact .pocket-inferno__seat-marker {
+  min-width: 21px;
+  height: 20px;
+  font-size: .5rem;
+}
+
+.pocket-inferno__hud {
+  position: absolute;
+  z-index: 8;
+  top: 96px;
+  left: 10px;
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.pocket-inferno__hud-card {
+  min-width: 62px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 11px;
+  background: rgba(20,15,31,.72);
+  box-shadow: 0 7px 14px rgba(0,0,0,.22);
+  backdrop-filter: blur(8px);
+}
+
+.pocket-inferno__hud-card span,
+.pocket-inferno__hud-card strong {
+  display: block;
+}
+
+.pocket-inferno__hud-card span {
+  color: var(--pa-muted);
+  font-size: .48rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.pocket-inferno__hud-card strong {
+  margin-top: 2px;
+  font-size: .76rem;
+  font-weight: 900;
+}
+
+.pocket-inferno__game-message {
+  position: absolute;
+  z-index: 12;
+  top: 45%;
+  left: 50%;
+  display: none;
+  max-width: 80%;
+  padding: 10px 15px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 14px;
+  color: #fff;
+  background: rgba(20,15,31,.82);
+  box-shadow: 0 18px 34px rgba(0,0,0,.38);
+  font-size: .88rem;
+  font-weight: 900;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(8px);
+}
+
+.pocket-inferno__game-message.is-visible {
+  display: block;
+}
+
+.pocket-inferno__game-message.is-countdown {
+  min-width: 74px;
+  padding: 12px 18px;
+  border-color: rgba(245,184,61,.72);
+  color: #fff5c8;
+  background: rgba(94,55,15,.82);
+  font-size: 2rem;
+}
+
+.pocket-inferno__controller-warning {
+  position: absolute;
+  z-index: 15;
+  right: 14px;
+  bottom: 145px;
+  display: none;
+  max-width: 260px;
+  padding: 10px;
+  border: 1px solid rgba(245,184,61,.55);
+  border-radius: 14px;
+  background: rgba(45,35,17,.91);
+  box-shadow: var(--pa-shadow-panel);
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+.pocket-inferno__controller-warning.is-visible {
+  display: grid;
+  gap: 8px;
+}
+
+.pocket-inferno__controller-warning button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 10px;
+  color: #2b1d05;
+  background: #f5b83d;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.pocket-inferno__touch-layer {
+  position: absolute;
+  z-index: 10;
+  inset: auto 0 0;
+  height: clamp(126px, 25%, 176px);
+  pointer-events: none;
+  touch-action: none;
+}
+
+.pocket-inferno__move-pad,
+.pocket-inferno__look-pad,
+.pocket-inferno__fire-button,
+.pocket-inferno__weapon-button {
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.pocket-inferno__move-pad {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  width: clamp(92px, 18vw, 126px);
+  aspect-ratio: 1;
+  border: 2px solid rgba(255,255,255,.18);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255,255,255,.08) 0 20%, transparent 21%),
+    rgba(18,14,29,.55);
+  box-shadow: inset 0 0 0 8px rgba(255,255,255,.025), 0 12px 26px rgba(0,0,0,.26);
+  backdrop-filter: blur(6px);
+}
+
+.pocket-inferno__move-pad::before,
+.pocket-inferno__move-pad::after {
+  position: absolute;
+  background: rgba(255,255,255,.12);
+  content: "";
+}
+
+.pocket-inferno__move-pad::before {
+  top: 10%;
+  bottom: 10%;
+  left: calc(50% - 1px);
+  width: 2px;
+}
+
+.pocket-inferno__move-pad::after {
+  top: calc(50% - 1px);
+  right: 10%;
+  left: 10%;
+  height: 2px;
+}
+
+.pocket-inferno__stick {
+  position: absolute;
+  z-index: 2;
+  top: calc(50% - 24%);
+  left: calc(50% - 24%);
+  width: 48%;
+  height: 48%;
+  border: 3px solid rgba(255,255,255,.36);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #8067ed, #5136b6);
+  box-shadow: inset 0 -7px 0 rgba(31,20,75,.24), 0 8px 16px rgba(0,0,0,.28);
+}
+
+.pocket-inferno__look-pad {
+  position: absolute;
+  right: clamp(108px, 18vw, 144px);
+  bottom: 13px;
+  display: grid;
+  width: clamp(94px, 20vw, 150px);
+  height: clamp(80px, 15vw, 114px);
+  place-items: center;
+  border: 2px solid rgba(255,255,255,.14);
+  border-radius: 22px;
+  color: rgba(255,255,255,.5);
+  background:
+    linear-gradient(90deg, transparent 49%, rgba(255,255,255,.08) 50% 51%, transparent 52%),
+    rgba(18,14,29,.46);
+  box-shadow: 0 12px 26px rgba(0,0,0,.24);
+  font-size: .52rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  backdrop-filter: blur(6px);
+}
+
+.pocket-inferno__look-pad.is-active {
+  border-color: rgba(245,184,61,.7);
+  color: #fff2b8;
+  background-color: rgba(72,49,15,.56);
+}
+
+.pocket-inferno__fire-button {
+  position: absolute;
+  right: 14px;
+  bottom: 17px;
+  width: clamp(82px, 14vw, 108px);
+  aspect-ratio: 1;
+  border: 4px solid rgba(255,245,228,.35);
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(145deg, #ff756f, #b62f49);
+  box-shadow: inset 0 -10px 0 rgba(87,20,39,.24), 0 11px 24px rgba(0,0,0,.35);
+  font-size: clamp(.78rem, 2vw, 1rem);
+  font-weight: 900;
+  letter-spacing: .06em;
+}
+
+.pocket-inferno__fire-button.is-held {
+  transform: translateY(4px) scale(.96);
+  box-shadow: inset 0 -4px 0 rgba(87,20,39,.2), 0 5px 12px rgba(0,0,0,.28), 0 0 0 6px rgba(239,93,103,.18);
+}
+
+.pocket-inferno__weapon-controls {
+  position: absolute;
+  right: 14px;
+  bottom: clamp(106px, 18vw, 134px);
+  display: flex;
+  gap: 6px;
+}
+
+.pocket-inferno__weapon-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 11px;
+  color: var(--pa-ink);
+  background: rgba(20,15,31,.72);
+  box-shadow: 0 7px 14px rgba(0,0,0,.22);
+  font-size: .58rem;
+  font-weight: 800;
+  backdrop-filter: blur(7px);
+}
+
+.pocket-inferno__weapon-button span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 7px;
+  color: #1f172d;
+  background: #fff7e4;
+  font-size: .62rem;
+}
+
+.pocket-inferno__weapon-button b {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  color: #44290b;
+  background: var(--pa-gold);
+  font-size: .56rem;
+}
+
+.pocket-inferno__weapon-button.is-selected {
+  border-color: rgba(248,214,101,.88);
+  background: linear-gradient(135deg, rgba(255,244,188,.26), rgba(70,48,10,.78));
+  box-shadow: inset 0 0 0 2px rgba(255,236,164,.12), 0 8px 18px rgba(91,61,9,.24);
+}
+
+.pocket-inferno__weapon-button.is-unavailable::after {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border: 2px solid rgba(255,255,255,.5);
+  border-radius: 50%;
+  content: "";
+}
+
+.pocket-inferno__damage-flash {
+  position: absolute;
+  z-index: 11;
+  inset: 0;
+  border: clamp(12px, 5vw, 42px) solid rgba(239,93,103,.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+  box-shadow: inset 0 0 80px rgba(239,93,103,.38);
+}
+
+.pocket-inferno__damage-flash.is-visible {
+  opacity: 1;
+}
+
+.pocket-inferno__results {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: clamp(18px, 4vw, 42px);
+  overflow: auto;
+  text-align: center;
+}
+
+.pocket-inferno__result-emblem {
+  display: grid;
+  width: 76px;
+  height: 76px;
+  place-items: center;
+  border: 6px solid rgba(255,255,255,.26);
+  border-radius: 24px;
+  color: #6a3e09;
+  background: linear-gradient(145deg, #fff0ae, #f5b83d);
+  box-shadow: var(--pa-shadow-panel), inset 0 -11px 0 rgba(166,109,8,.24);
+  font-size: 2rem;
+  transform: rotate(-5deg);
+}
+
+.pocket-inferno__results h2 {
+  font-size: clamp(1.45rem, 3.5vw, 2.5rem);
+}
+
+.pocket-inferno__result-list {
+  display: grid;
+  width: min(600px, 100%);
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.pocket-inferno__result-row {
+  display: grid;
+  grid-template-columns: 44px auto minmax(0,1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--pa-line);
+  border-radius: 15px;
+  background: rgba(255,255,255,.055);
+  text-align: left;
+}
+
+.pocket-inferno__result-row.is-winner {
+  border-color: rgba(248,214,101,.8);
+  background: linear-gradient(135deg, rgba(255,244,188,.22), rgba(71,48,12,.72));
+  box-shadow: 0 14px 26px rgba(118,84,18,.18);
+}
+
+.pocket-inferno__result-place {
+  color: var(--pa-gold);
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.pocket-inferno__result-details strong,
+.pocket-inferno__result-details small {
+  display: block;
+}
+
+.pocket-inferno__result-details strong {
+  font-size: .82rem;
+}
+
+.pocket-inferno__result-details small {
+  margin-top: 3px;
+  color: var(--pa-muted);
+  font-size: .64rem;
+}
+
+.pocket-inferno__toast {
+  position: absolute;
+  z-index: 50;
+  top: 72px;
+  left: 50%;
+  max-width: min(88%, 420px);
+  padding: 9px 13px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 13px;
+  opacity: 0;
+  color: #fff;
+  background: rgba(31,25,48,.94);
+  box-shadow: 0 16px 30px rgba(0,0,0,.3);
+  font-size: .74rem;
+  font-weight: 800;
+  text-align: center;
+  transform: translate(-50%, -12px);
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(.2,.82,.2,1);
+  pointer-events: none;
+}
+
+.pocket-inferno__toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.pocket-inferno__toast[data-kind="success"] { background: rgba(8,103,82,.95); }
+.pocket-inferno__toast[data-kind="danger"] { background: rgba(135,38,58,.96); }
+.pocket-inferno__toast[data-kind="warning"] { color: #2e210a; background: rgba(245,184,61,.97); }
+
+@media (max-width: 760px) {
+  .pocket-inferno {
+    min-height: min(620px, 100dvh);
+    border-radius: 20px;
+  }
+
+  .pocket-inferno__splash-art::after {
+    background:
+      linear-gradient(0deg, rgba(7, 4, 8, .96) 0 33%, rgba(7, 4, 8, .18) 62%, transparent 100%);
+  }
+
+  .pocket-inferno__splash-image {
+    object-position: 42% center;
+  }
+
+  .pocket-inferno__splash-copy {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+    min-width: 0;
+    padding: 15px;
+    border-radius: 18px;
+    backdrop-filter: blur(5px);
+  }
+
+  .pocket-inferno__pa-logo {
+    width: 138px;
+    max-height: 42px;
+  }
+
+  .pocket-inferno__players-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pocket-inferno__player-card {
+    min-height: 70px;
+    padding: 9px;
+  }
+
+  .pocket-inferno__avatar,
+  .pocket-inferno__open-avatar {
+    width: 38px;
+    height: 38px;
+  }
+
+  .pocket-inferno__player-rail {
+    right: 10px;
+    max-width: none;
+    overflow: hidden;
+  }
+
+  .pocket-inferno__player-card.is-compact {
+    flex: 1 1 0;
+  }
+
+  .pocket-inferno__player-card.is-compact .pocket-inferno__player-details {
+    display: none;
+  }
+
+  .pocket-inferno__player-card.is-compact .pocket-inferno__seat-marker {
+    display: none;
+  }
+
+  .pocket-inferno__hud {
+    top: 95px;
+  }
+
+  .pocket-inferno__hud-card {
+    min-width: 54px;
+    padding: 5px 7px;
+  }
+}
+
+@media (max-width: 430px) {
+  .pocket-inferno__topbar {
+    min-height: 50px;
+    padding: 7px 10px;
+  }
+
+  .pocket-inferno__brand-mark {
+    width: 29px;
+    height: 29px;
+  }
+
+  .pocket-inferno__brand strong {
+    font-size: .86rem;
+  }
+
+  .pocket-inferno__connection {
+    padding: 5px 7px;
+    font-size: .56rem;
+  }
+
+  .pocket-inferno__lobby {
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 16px 12px;
+  }
+
+  .pocket-inferno__lobby-hero {
+    align-items: flex-start;
+  }
+
+  .pocket-inferno__arena-icon {
+    width: 58px;
+    height: 58px;
+    border-width: 5px;
+    border-radius: 19px;
+  }
+
+  .pocket-inferno__arena-icon::before { inset: 13px 22px; }
+  .pocket-inferno__arena-icon::after { inset: 22px 13px; }
+
+  .pocket-inferno__lobby h2 {
+    font-size: 1.25rem;
+  }
+
+  .pocket-inferno__lobby-hero p:last-child {
+    font-size: .72rem;
+  }
+
+  .pocket-inferno__players-grid {
+    gap: 7px;
+  }
+
+  .pocket-inferno__player-card {
+    grid-template-columns: auto minmax(0,1fr);
+    min-height: 62px;
+    gap: 7px;
+    padding: 7px;
+  }
+
+  .pocket-inferno__player-card .pocket-inferno__seat-marker {
+    display: none;
+  }
+
+  .pocket-inferno__player-details strong,
+  .pocket-inferno__player-card > strong {
+    font-size: .7rem;
+  }
+
+  .pocket-inferno__player-details small {
+    font-size: .56rem;
+  }
+
+  .pocket-inferno__lobby-actions,
+  .pocket-inferno__result-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+
+  .pocket-inferno__lobby-actions .pocket-inferno__primary-button,
+  .pocket-inferno__result-actions .pocket-inferno__primary-button {
+    grid-column: 1 / -1;
+  }
+
+  .pocket-inferno__hud {
+    top: 91px;
+  }
+
+  .pocket-inferno__hud-card:nth-child(2) {
+    display: none;
+  }
+
+  .pocket-inferno__weapon-button {
+    padding: 4px 6px;
+    font-size: 0;
+  }
+
+  .pocket-inferno__weapon-button span,
+  .pocket-inferno__weapon-button b {
+    font-size: .56rem;
+  }
+
+  .pocket-inferno__controller-warning {
+    right: 10px;
+    bottom: 128px;
+    max-width: 210px;
+  }
+}
+
+@media (max-height: 620px) {
+  .pocket-inferno {
+    min-height: 100%;
+    height: 100%;
+  }
+
+  .pocket-inferno__topbar {
+    min-height: 46px;
+    padding-block: 6px;
+  }
+
+  .pocket-inferno__brand-mark {
+    width: 29px;
+    height: 29px;
+  }
+
+  .pocket-inferno__splash-copy {
+    gap: 7px;
+    padding: 12px 14px;
+  }
+
+  .pocket-inferno__chips {
+    display: none;
+  }
+
+  .pocket-inferno__lobby {
+    gap: 12px;
+    padding-block: 12px;
+  }
+
+  .pocket-inferno__lobby-hero p:last-child {
+    margin-top: 4px;
+  }
+
+  .pocket-inferno__player-card {
+    min-height: 58px;
+    padding: 7px;
+  }
+
+  .pocket-inferno__avatar,
+  .pocket-inferno__open-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .pocket-inferno__touch-layer {
+    height: 132px;
+  }
+
+  .pocket-inferno__move-pad {
+    width: 94px;
+  }
+
+  .pocket-inferno__look-pad {
+    right: 105px;
+    width: 100px;
+    height: 80px;
+  }
+
+  .pocket-inferno__fire-button {
+    width: 80px;
+  }
+
+  .pocket-inferno__weapon-controls {
+    bottom: 101px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pocket-inferno__primary-button:hover,
+  .pocket-inferno__secondary-button:hover,
+  .pocket-inferno__icon-button:hover,
+  .pocket-inferno__weapon-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .pocket-inferno__move-pad,
+  .pocket-inferno__look-pad,
+  .pocket-inferno__fire-button {
+    opacity: .72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pocket-inferno *,
+  .pocket-inferno *::before,
+  .pocket-inferno *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+
+  .pocket-inferno__splash-fighter,
+  .pocket-inferno__result-emblem,
+  .pocket-inferno__arena-icon,
+  .pocket-inferno__brand-mark {
+    transform: none;
+  }
+}

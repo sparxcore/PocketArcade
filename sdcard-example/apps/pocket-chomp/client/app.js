@@ -33,6 +33,10 @@
   ];
   const CHOMPER_COLOURS = ["#ffe24a", "#8cff5a"];
   const GHOST_COLOURS = ["#ff5ca8", "#58e5ff"];
+  const APP_VERSION = "1.1.0";
+  const assetBase = new URL(".", document.currentScript.src);
+  const iconUrl = new URL("../assets/icon.svg", assetBase).href;
+  const splashUrl = new URL("../assets/splash.png", assetBase).href;
 
   window.PocketArcadeApps = window.PocketArcadeApps || {};
 
@@ -45,36 +49,98 @@
       let connected = arcade.connectionStatus !== "disconnected";
       let frameId = 0;
       let resizeObserver = null;
-      let fullscreenMatchId = null;
       let swipeStart = null;
+      let enterFullscreenOnPlay = false;
       const renderPlayers = new Map();
       const effects = [];
 
       const root = document.createElement("section");
       root.className = "pocket-chomp";
 
+      const topbar = document.createElement("header");
+      topbar.className = "pc-topbar";
+      const topbarBrand = document.createElement("div");
+      topbarBrand.className = "pc-topbar-brand";
+      const appIcon = document.createElement("img");
+      appIcon.className = "pc-app-icon";
+      appIcon.src = iconUrl;
+      appIcon.alt = "";
+      const topbarCopy = document.createElement("div");
+      const topbarTitle = document.createElement("strong");
+      topbarTitle.textContent = "Pocket Chomp";
+      const topbarSubtitle = document.createElement("span");
+      topbarSubtitle.textContent = "Multiplayer maze chase";
+      topbarCopy.append(topbarTitle, topbarSubtitle);
+      topbarBrand.append(appIcon, topbarCopy);
+
+      const topbarActions = document.createElement("div");
+      topbarActions.className = "pc-topbar-actions";
+      const connectionBadge = document.createElement("span");
+      connectionBadge.className = "pc-connection-badge";
+      const connectionDot = document.createElement("span");
+      connectionDot.className = "pc-connection-dot";
+      const connectionText = document.createElement("span");
+      connectionBadge.append(connectionDot, connectionText);
+      const fullscreenButton = createButton("Full screen", "secondary", () => {
+        if (arcade.display.fullscreen) arcade.display.exitFullscreen();
+        else arcade.display.requestFullscreen();
+      });
+      fullscreenButton.classList.add("pc-fullscreen-button");
+      topbarActions.append(connectionBadge, fullscreenButton);
+      topbar.append(topbarBrand, topbarActions);
+
+      const stage = document.createElement("div");
+      stage.className = "pc-stage";
+
       const toast = document.createElement("div");
       toast.className = "pc-toast";
       toast.setAttribute("aria-live", "polite");
 
-      const lobby = document.createElement("div");
-      lobby.className = "pc-lobby";
+      const splash = document.createElement("section");
+      splash.className = "pc-splash";
+      const splashArtwork = document.createElement("img");
+      splashArtwork.className = "pc-splash-artwork";
+      splashArtwork.src = splashUrl;
+      splashArtwork.alt = "Pixel art Pocket Chomp cabinet with Chomper and four ghosts in a neon maze";
+      splashArtwork.loading = "eager";
+      splashArtwork.decoding = "async";
+      const splashPanel = document.createElement("div");
+      splashPanel.className = "pc-splash-panel";
+      const splashTitle = document.createElement("h1");
+      splashTitle.textContent = "Chomp the maze or hunt the Chompers";
+      const splashCopy = document.createElement("p");
+      splashCopy.textContent = "Every character is controlled by a player. Choose a side preference, ready up and race through a two-minute neon maze.";
+      const splashMeta = document.createElement("div");
+      splashMeta.className = "pc-splash-meta";
+      [
+        `v${APP_VERSION}`,
+        "2–4 players",
+        "Chompers vs Ghosts",
+      ].forEach((label) => {
+        const chip = document.createElement("span");
+        chip.textContent = label;
+        splashMeta.append(chip);
+      });
+      const splashJoinButton = createButton("Join Pocket Chomp", "primary", () => {
+        arcade.game.join(APP_ID);
+      });
+      splashJoinButton.classList.add("pc-splash-join");
+      splashPanel.append(splashTitle, splashCopy, splashMeta, splashJoinButton);
+      splash.append(splashArtwork, splashPanel);
 
-      const brand = document.createElement("header");
-      brand.className = "pc-brand";
-      const brandMark = document.createElement("div");
-      brandMark.className = "pc-brand-mark";
-      brandMark.textContent = "◖";
-      const brandCopy = document.createElement("div");
-      const title = document.createElement("h1");
-      title.textContent = "Pocket Chomp";
-      const subtitle = document.createElement("p");
-      subtitle.textContent = "Chomp the maze. Hunt the Chompers. Every role is human.";
-      brandCopy.append(title, subtitle);
-      brand.append(brandMark, brandCopy);
+      const lobby = document.createElement("section");
+      lobby.className = "pc-lobby";
+      const lobbyHeader = document.createElement("header");
+      lobbyHeader.className = "pc-lobby-header";
+      const lobbyTitle = document.createElement("h1");
+      lobbyTitle.textContent = "Match lobby";
+      const lobbyIntro = document.createElement("p");
+      lobbyIntro.textContent = "Pick a role preference. Teams are balanced when every joined player is ready.";
+      lobbyHeader.append(lobbyTitle, lobbyIntro);
 
       const lobbyStatus = document.createElement("p");
       lobbyStatus.className = "pc-lobby-status";
+      lobbyStatus.setAttribute("aria-live", "polite");
 
       const seatGrid = document.createElement("div");
       seatGrid.className = "pc-seat-grid";
@@ -84,7 +150,7 @@
       const setupTitle = document.createElement("h2");
       setupTitle.textContent = "Choose your preference";
       const setupHint = document.createElement("p");
-      setupHint.textContent = "Final teams auto-balance when the match starts.";
+      setupHint.textContent = "Your final team is assigned automatically when the match begins.";
       const roleChooser = document.createElement("div");
       roleChooser.className = "pc-role-chooser";
       const roleButtons = new Map();
@@ -110,11 +176,10 @@
 
       const lobbyActions = document.createElement("div");
       lobbyActions.className = "pc-lobby-actions";
-      const joinButton = createButton("Join game", "primary", () => {
-        arcade.game.join(APP_ID);
-      });
       const readyButton = createButton("Ready", "primary", () => {
-        if (activeMatch) arcade.game.ready(activeMatch.matchId);
+        if (!activeMatch) return;
+        enterFullscreenOnPlay = true;
+        arcade.game.ready(activeMatch.matchId);
       });
       const claimButton = createButton("Take control", "secondary", () => {
         if (activeMatch) arcade.game.claimControl(activeMatch.matchId);
@@ -122,12 +187,12 @@
       const leaveButton = createButton("Leave", "quiet", () => {
         if (activeMatch) arcade.game.leave(activeMatch.matchId);
       });
-      lobbyActions.append(joinButton, readyButton, claimButton, leaveButton);
+      lobbyActions.append(readyButton, claimButton, leaveButton);
 
       const spectatorList = document.createElement("div");
       spectatorList.className = "pc-spectators";
 
-      lobby.append(brand, lobbyStatus, seatGrid, setupCard, lobbyActions, spectatorList);
+      lobby.append(lobbyHeader, lobbyStatus, seatGrid, setupCard, lobbyActions, spectatorList);
 
       const arena = document.createElement("div");
       arena.className = "pc-arena";
@@ -155,10 +220,15 @@
       phaseOverlay.className = "pc-phase-overlay";
       boardShell.append(canvas, phaseOverlay);
 
-      const controls = document.createElement("div");
+      const controls = document.createElement("section");
       controls.className = "pc-controls";
-      const controlLabel = document.createElement("div");
+      const controlCopy = document.createElement("div");
+      controlCopy.className = "pc-control-copy";
+      const controlLabel = document.createElement("strong");
       controlLabel.className = "pc-control-label";
+      const controlHint = document.createElement("span");
+      controlHint.className = "pc-control-hint";
+      controlCopy.append(controlLabel, controlHint);
       const dpad = document.createElement("div");
       dpad.className = "pc-dpad";
       DIRECTIONS.forEach((direction, index) => {
@@ -182,7 +252,7 @@
         if (activeMatch) arcade.game.leave(activeMatch.matchId);
       });
       arenaActions.append(arenaClaimButton, arenaLeaveButton);
-      controls.append(controlLabel, dpad, arenaActions);
+      controls.append(controlCopy, dpad, arenaActions);
 
       const resultPanel = document.createElement("section");
       resultPanel.className = "pc-result-panel";
@@ -197,7 +267,8 @@
       resultPanel.append(resultTitle, resultCopy, resultPlacements, playAgainButton);
 
       arena.append(hud, playerStrip, boardShell, controls, resultPanel);
-      root.append(lobby, arena, toast);
+      stage.append(splash, lobby, arena);
+      root.append(topbar, stage, toast);
       container.replaceChildren(root);
 
       const context = canvas.getContext("2d", { alpha: false });
@@ -240,9 +311,9 @@
         latestSnapshotRevision = -1;
         gameState = null;
         result = null;
-        fullscreenMatchId = null;
         renderPlayers.clear();
         effects.length = 0;
+        enterFullscreenOnPlay = false;
         arcade.display.exitFullscreen();
         renderUI();
       }
@@ -258,7 +329,7 @@
           result = null;
           renderPlayers.clear();
           effects.length = 0;
-          fullscreenMatchId = null;
+          enterFullscreenOnPlay = false;
         }
         activeMatch = match;
         renderUI();
@@ -297,12 +368,19 @@
           (activeMatch.state === "playing" || gameState?.phase === "countdown" || gameState?.phase === "playing" || gameState?.phase === "finished")
         );
 
-        lobby.hidden = inArena;
+        splash.hidden = isMember;
+        lobby.hidden = !isMember || inArena;
         arena.hidden = !inArena;
         root.classList.toggle("is-spectator", activeMatch?.you?.role === "spectator");
         root.classList.toggle("is-disconnected", !connected);
+        root.classList.toggle("is-playing", inArena);
 
-        joinButton.hidden = isMember;
+        connectionText.textContent = connected ? "Connected" : "Reconnecting";
+        connectionBadge.classList.toggle("is-connected", connected);
+        splashJoinButton.disabled = !connected;
+        fullscreenButton.hidden = !inArena || arcade.display.fullscreen;
+        fullscreenButton.textContent = arcade.display.fullscreen ? "Windowed" : "Full screen";
+
         readyButton.hidden = !isPlayer;
         claimButton.hidden = !isPlayer || Boolean(activeMatch?.you?.controller);
         leaveButton.hidden = !isMember;
@@ -315,7 +393,7 @@
       function renderLobby() {
         if (!activeMatch) {
           lobbyStatus.textContent = connected
-            ? "Join a 2–4 player match."
+            ? "Choose Join to enter a match."
             : "Reconnecting to PocketArcade…";
           seatGrid.replaceChildren();
           spectatorList.replaceChildren();
@@ -333,9 +411,18 @@
 
         const stateBySeat = new Map((gameState?.players || []).map((player) => [player.seat, player]));
         const cards = [];
-        activeMatch.seats.forEach((seat) => {
+        const orderedSeats = activeMatch.seats.slice().sort((a, b) => {
+          const aOwn = a.seat === ownSeat() ? 0 : 1;
+          const bOwn = b.seat === ownSeat() ? 0 : 1;
+          if (aOwn !== bOwn) return aOwn - bOwn;
+          const aOpen = a.player ? 0 : 1;
+          const bOpen = b.player ? 0 : 1;
+          return aOpen - bOpen || a.seat - b.seat;
+        });
+        orderedSeats.forEach((seat) => {
           const card = document.createElement("article");
           card.className = "pc-seat-card";
+          card.dataset.seat = String(seat.seat);
           if (!seat.player) card.classList.add("is-open");
           if (seat.seat === ownSeat()) card.classList.add("is-you");
 
@@ -358,7 +445,7 @@
           const copy = document.createElement("div");
           copy.className = "pc-seat-copy";
           const name = document.createElement("strong");
-          name.textContent = seat.player?.nickname || "Open seat";
+          name.textContent = seat.player?.nickname || "Open Seat";
           const meta = document.createElement("span");
           const playerState = stateBySeat.get(seat.seat);
           if (!seat.player) {
@@ -431,12 +518,17 @@
           return;
         }
 
-        if ((gameState.phase === "countdown" || gameState.phase === "playing") && activeMatch && fullscreenMatchId !== activeMatch.matchId) {
-          fullscreenMatchId = activeMatch.matchId;
+        if (enterFullscreenOnPlay && activeMatch?.you?.role === "player" &&
+            (gameState.phase === "countdown" || gameState.phase === "playing")) {
+          enterFullscreenOnPlay = false;
           arcade.display.requestFullscreen();
         }
 
-        const players = gameState.players || [];
+        const players = (gameState.players || []).slice().sort((a, b) => {
+          if (a.seat === ownSeat()) return -1;
+          if (b.seat === ownSeat()) return 1;
+          return a.seat - b.seat;
+        });
         const chomperScore = players
           .filter((player) => player.role === "chomper")
           .reduce((sum, player) => sum + player.score, 0);
@@ -462,6 +554,7 @@
         const playerCards = players.map((player) => {
           const card = document.createElement("article");
           card.className = `pc-player-card role-${player.role}`;
+          card.dataset.seat = String(player.seat);
           if (player.seat === ownSeat()) card.classList.add("is-you");
           if (!player.active) card.classList.add("is-inactive");
           const icon = document.createElement("span");
@@ -478,14 +571,41 @@
           card.append(icon, copy);
           return card;
         });
-        playerStrip.replaceChildren(...playerCards);
+        const spectatorCards = (activeMatch?.spectators || []).map((spectator) => {
+          const card = document.createElement("article");
+          card.className = "pc-player-card role-spectator";
+          const avatar = document.createElement("span");
+          avatar.className = "pc-player-avatar";
+          if (spectator.avatarUrl) {
+            const image = document.createElement("img");
+            image.src = spectator.avatarUrl;
+            image.alt = "";
+            image.addEventListener("error", () => {
+              avatar.replaceChildren(initialsNode(spectator.nickname));
+            }, { once: true });
+            avatar.append(image);
+          } else {
+            avatar.append(initialsNode(spectator.nickname));
+          }
+          const name = document.createElement("strong");
+          name.textContent = spectator.nickname;
+          card.append(avatar, name);
+          return card;
+        });
+        playerStrip.replaceChildren(...playerCards, ...spectatorCards);
 
         const own = ownState();
-        controlLabel.textContent = activeMatch?.you?.role === "spectator"
+        const isSpectating = activeMatch?.you?.role === "spectator";
+        controlLabel.textContent = isSpectating
           ? "Spectating live"
           : own
             ? `You are ${own.role === "chomper" ? "a Chomper" : "a Ghost"}`
             : "Waiting for role";
+        controlHint.textContent = isSpectating
+          ? "Watch the chase and player scores."
+          : activeMatch?.you?.controller
+            ? "Swipe the maze or use the direction controls."
+            : "This profile is controlled in another tab.";
 
         const controlsEnabled = Boolean(
           connected &&
@@ -494,8 +614,12 @@
           gameState.phase === "playing" &&
           own?.active
         );
+        controls.classList.toggle("is-active", controlsEnabled);
+        controls.classList.toggle("is-spectating", isSpectating);
+        dpad.hidden = isSpectating;
         dpad.querySelectorAll("button").forEach((button) => {
           button.disabled = !controlsEnabled;
+          button.setAttribute("aria-disabled", String(!controlsEnabled));
         });
         arenaClaimButton.hidden = activeMatch?.you?.role !== "player" || Boolean(activeMatch?.you?.controller);
         arenaLeaveButton.hidden = !activeMatch || activeMatch.you?.role === "none";
@@ -904,6 +1028,7 @@
           return;
         }
         if (error.code === "runtime_failed") {
+          clearMatchState();
           showToast("The game runtime stopped. Join a fresh match.");
         } else if (error.code === "rate_limited" || error.code === "queue_full") {
           showToast("Input is moving too quickly. Try again.");
@@ -920,6 +1045,8 @@
 
       const stopFullscreen = arcade.display.onFullscreenChange((fullscreen) => {
         root.classList.toggle("fullscreen", fullscreen);
+        fullscreenButton.hidden = fullscreen || arena.hidden;
+        fullscreenButton.textContent = "Full screen";
         window.requestAnimationFrame(resizeCanvas);
       });
 

@@ -5,3 +5,4 @@ sdkconfig.old
 main/generated/
 __pycache__/
 *.pyc
+sdcard-example/

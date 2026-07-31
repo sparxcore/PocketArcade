@@ -1,9 +1,9 @@
 {
   "manifestVersion": 2,
-  "id": "tic-tac-toe",
-  "name": "Tic-Tac-Toe",
-  "description": "A polished two-player classic with live spectators and PocketArcade styling.",
-  "version": "1.2.2",
+  "id": "pocket-siege",
+  "name": "Pocket Siege",
+  "description": "A two-player turn-based slingshot battle with destructible forts and special projectiles.",
+  "version": "1.2.0",
   "minPlatformVersion": "0.3.0",
   "kind": "game",
   "client": {
@@ -13,7 +13,8 @@
   "runtime": {
     "type": "lua",
     "entrypoint": "server/main.lua",
-    "mode": "event"
+    "mode": "tick",
+    "tickRateHz": 15
   },
   "multiplayer": {
     "minPlayers": 2,
@@ -26,7 +27,6 @@
     "version": 1
   },
   "capabilities": [
-    "presence.read",
     "match.seats",
     "match.results"
   ]

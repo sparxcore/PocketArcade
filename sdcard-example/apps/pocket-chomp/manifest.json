@@ -3,7 +3,7 @@
   "id": "pocket-chomp",
   "name": "Pocket Chomp",
   "description": "A fast multiplayer maze chase with human Chompers and Ghosts.",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "minPlatformVersion": "0.3.0",
   "kind": "game",
   "client": {

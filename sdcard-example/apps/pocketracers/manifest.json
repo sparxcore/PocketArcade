@@ -3,7 +3,7 @@
   "id": "pocketracers",
   "name": "PocketRacers",
   "description": "A two-to-four-player top-down circuit racing game.",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "minPlatformVersion": "0.3.0",
   "kind": "game",
   "client": {

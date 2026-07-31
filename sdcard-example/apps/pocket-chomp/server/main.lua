@@ -467,8 +467,7 @@ local function tunnel_distance_x(a, b)
     return math.min(direct, WIDTH - direct)
 end
 
-local function resolve_collisions(context)
-    local ordered = players_in_seat_order(context)
+local function resolve_collisions(context, ordered)
     for _, chomper in ipairs(ordered) do
         if chomper.role == "chomper" and chomper.active then
             for _, ghost in ipairs(ordered) do
@@ -509,9 +508,9 @@ local function resolve_collisions(context)
     end
 end
 
-local function count_active_chompers(context)
+local function count_active_chompers(ordered)
     local count = 0
-    for _, player in ipairs(players_in_seat_order(context)) do
+    for _, player in ipairs(ordered) do
         if player.role == "chomper" and (player.active or player.lives > 0) then
             count = count + 1
         end
@@ -643,11 +642,11 @@ return {
             consume_pellet(context, current)
         end
 
-        resolve_collisions(context)
+        resolve_collisions(context, ordered)
 
         if context.pelletsRemaining <= 0 then
             finish_round(context, "chomper", "maze_cleared")
-        elseif count_active_chompers(context) <= 0 then
+        elseif count_active_chompers(ordered) <= 0 then
             finish_round(context, "ghost", "all_chompers_caught")
         elseif context.roundTimeMs <= 0 then
             finish_round(context, "ghost", "time_expired")

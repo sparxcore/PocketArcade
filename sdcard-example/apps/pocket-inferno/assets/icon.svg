@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Pocket Inferno arena icon</title>
+  <defs>
+    <linearGradient id="bg" x1="18" y1="10" x2="112" y2="119" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ef5d67"/>
+      <stop offset="1" stop-color="#f5b83d"/>
+    </linearGradient>
+  </defs>
+  <rect x="7" y="7" width="114" height="114" rx="32" fill="#211c38"/>
+  <rect x="14" y="14" width="100" height="100" rx="27" fill="url(#bg)"/>
+  <path fill="#fff7e4" d="M53 28h22v25h25v22H75v25H53V75H28V53h25z"/>
+  <path fill="#513046" d="M58 33h12v25h25v12H70v25H58V70H33V58h25z" opacity=".32"/>
+</svg>
