@@ -59,6 +59,15 @@ config PA_HTTP_MAX_BODY
     range 256 8192
     default 2048
 
+config PA_HTTP_TASK_STACK_BYTES
+    int "HTTP server task stack size (bytes)"
+    range 4096 16384
+    default 8192
+    help
+        Stack available to HTTP and WebSocket request handlers. Profile
+        restoration and initial WebSocket snapshots require more than the
+        ESP-IDF HTTP server's 4096-byte default.
+
 config PA_AVATAR_MAX_BYTES
     int "Maximum processed avatar JPEG size"
     range 4096 32768
