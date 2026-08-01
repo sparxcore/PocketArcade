@@ -65,6 +65,17 @@ main {
 .hero-beta {
   flex: 0 0 auto;
   margin-left: clamp(-2.5rem, -4vw, -1.25rem);
+  padding: clamp(0.38rem, 1.2vw, 0.55rem) clamp(0.55rem, 1.8vw, 0.8rem);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.55rem;
+  color: #17102b;
+  background: var(--focus);
+  box-shadow: 0 0 24px rgba(255, 216, 77, 0.3);
+  font-size: clamp(0.7rem, 2.3vw, 1.15rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  transform: rotate(-2deg);
   white-space: nowrap;
 }
 

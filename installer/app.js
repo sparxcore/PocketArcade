@@ -26,7 +26,7 @@ function boardCard(board) {
   details.append(
     definition("Flash", board.hardware.flash),
     definition("PSRAM", board.hardware.psram),
-    definition("microSD", board.hardware.sdCard),
+    definition("microSD", "Required"),
   );
 
   const notes = document.createElement("p");

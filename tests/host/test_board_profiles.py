@@ -126,6 +126,11 @@ class BoardProfileTests(unittest.TestCase):
             )
             page = (output / "index.html").read_text()
             self.assertIn('src="assets/logo-horizontal.webp"', page)
+            self.assertIn('class="hero-beta"', page)
+            installer_script = (output / "app.js").read_text()
+            self.assertIn(
+                'definition("microSD", "Required")', installer_script
+            )
 
     def test_pages_workflow_publishes_provisional_board_choices(self):
         workflow = (
