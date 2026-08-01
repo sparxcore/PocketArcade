@@ -7,6 +7,7 @@ class PocketArcadeClient {
     this.profile = null;
     this.health = null;
     this.storage = { mounted: false };
+    this.wifi = null;
     this.apps = [];
     this.players = new Map();
     this.chatMessages = [];
@@ -533,6 +534,26 @@ class PocketArcadeClient {
     this.storage = storage;
     this.emit("storage.changed", storage);
     return { health, storage };
+  }
+
+  async refreshWifiSettings() {
+    const wifi = await this.request("/api/v1/wifi", {
+      headers: { "X-PocketArcade-Token": this.token },
+    });
+    this.wifi = wifi;
+    this.emit("wifi.changed", wifi);
+    return wifi;
+  }
+
+  async setWifiAccessKey(accessKey) {
+    const wifi = await this.request("/api/v1/wifi/security", {
+      method: "PUT",
+      headers: { "X-PocketArcade-Token": this.token },
+      body: { accessKey },
+    });
+    this.wifi = wifi;
+    this.emit("wifi.changed", wifi);
+    return wifi;
   }
 
   async waitForStorage(predicate, timeoutMs = 12000) {

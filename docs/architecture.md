@@ -14,7 +14,7 @@ profiles so persisted profile files can be loaded once into RAM.
 | `board_config` | One Kconfig surface for product, limits, interface, and pins |
 | `system_state` | Locked uptime/resource counters used by health responses |
 | `device_identity` | NVS secret, HMAC-SHA256, constant-time digest comparison |
-| `wifi_ap` | SoftAP, DHCP/IP events, bounded server-observed station mapping |
+| `wifi_ap` | Persistent random SSID suffix, NVS security setting, SoftAP, DHCP/IP events, bounded station mapping |
 | `captive_portal` | Wildcard DNS, captive API, and OS captive-check redirects |
 | `storage` | SDMMC/SDSPI mount, FATFS status, paths, worker queue, safe writes |
 | `profiles` | Cached public/internal model, sessions, bindings, validation |
@@ -51,6 +51,9 @@ HTTP or /ws ─────────────┘
 ## Concurrency model
 
 - Wi-Fi and IP callbacks update only the bounded station cache/counters.
+- Administrator Wi-Fi changes are validated and committed to NVS by the HTTP
+  task, then applied by a delayed worker so the response reaches the client
+  before the access point disconnects stations.
 - HTTP callbacks bound and parse one JSON body, mutate RAM state, enqueue
   persistence, and return. Avatar uploads decode one tightly bounded JPEG into
   RAM and transfer ownership to the queue. They never write the SD card.

@@ -38,6 +38,20 @@ writes, waits for active application reads, and unmounts FATFS.
 Requires an administrator token. Requests a mount after reinsertion. This is
 needed on slots such as the ESP32-CAM's which have no card-detect contact.
 
+## `GET /wifi`
+
+Requires an administrator token. Returns the generated `ssid`, whether it is
+`secured`, and `reconnectRequired: false`. The current access key is never
+returned.
+
+## `PUT /wifi/security`
+
+Requires an administrator token. Body: `{"accessKey":"eight-or-more"}`.
+The value must be empty (to make the network open) or 8–63 printable ASCII
+characters. The setting is persisted in NVS. A changed value returns
+`202 Accepted` with `reconnectRequired: true`; the access point applies it
+after the response and disconnects all clients so they can rejoin.
+
 ## `POST /profile`
 
 Body:

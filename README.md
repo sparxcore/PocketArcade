@@ -127,7 +127,8 @@ On Windows the port may look like `COM5`. Exit the monitor with
 
 Then:
 
-1. Join Wi-Fi `PocketArcade`.
+1. Join the Wi-Fi network named `PocketArcade-XX`, where `XX` is the
+   device's persistent two-character identifier.
 2. Use Android's **Sign in to network** notification (or the equivalent
    portal prompt). The flash-hosted welcome screen opens first.
 3. Choose **Start** to request the full PocketArcade UI in the device browser.
@@ -141,9 +142,10 @@ Captive browsers also decide whether a new HTTP browsing context can leave
 their sign-in window; the welcome screen includes an **Open in browser**
 fallback instruction. `http://192.168.4.1/` always opens the full UI directly.
 
-The default network is open so nearby players can join quickly. Set an
-8–63-byte password under **PocketArcade → Access-point password** when network
-access control is preferred.
+The default network is open so nearby players can join quickly. The first
+profile authenticated after boot can open **Profile → Admin → Wi-Fi security**
+and set an 8–63 character access key. The setting persists on the device;
+changing or removing it restarts Wi-Fi and requires every player to reconnect.
 
 `http://play.local/` is a best-effort convenience name while a client uses the
 AP-provided DNS. The numeric address is the supported fallback and normal
@@ -252,8 +254,8 @@ administrator for that running session. The role is deliberately not persisted
 to the SD card. Only its token can mount or safely eject storage; the controls
 are under **Profile → Admin**. If the administrator switches away from its last
 device binding or deletes the profile, the next profile to authenticate becomes
-administrator. This is local operational convenience, not strong security on
-an open Wi-Fi network.
+administrator. This is local operational convenience. Set a Wi-Fi access key
+before relying on the administrator role to restrict access by nearby devices.
 
 Roundels start as a neutral circle, change colour through early wins, then
 change shape as totals rise. Validated first-place results update the aggregate

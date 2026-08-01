@@ -201,7 +201,7 @@
   <dialog id="admin-dialog">
     <form method="dialog">
       <p class="step">ADMINISTRATOR</p>
-      <h2>Device status &amp; SD card</h2>
+      <h2>Device administration</h2>
       <div class="admin-metrics" role="group"
            aria-label="Current device resource usage">
         <section class="admin-metric">
@@ -238,6 +238,44 @@
       <p class="notice">
         Always wait until PocketArcade says the card is safe to remove.
       </p>
+      <section class="admin-wifi" aria-labelledby="admin-wifi-title">
+        <div class="admin-wifi-heading">
+          <h3 id="admin-wifi-title">Wi-Fi security</h3>
+          <span id="wifi-security-status" class="security-pill">Checking…</span>
+        </div>
+        <p class="admin-wifi-network">
+          Network: <strong id="wifi-ssid">PocketArcade</strong>
+        </p>
+        <label for="wifi-access-key">New access key</label>
+        <div class="wifi-key-entry">
+          <input id="wifi-access-key" type="password" minlength="8"
+                 maxlength="63" autocomplete="new-password"
+                 autocapitalize="none" spellcheck="false"
+                 aria-describedby="wifi-access-key-help wifi-access-key-error">
+          <button id="wifi-toggle-key" type="button" aria-pressed="false"
+                  aria-controls="wifi-access-key">Show</button>
+        </div>
+        <div id="wifi-access-key-help" class="field-meta">
+          <span>8–63 printable characters</span>
+          <span id="wifi-access-key-count">0 / 63</span>
+        </div>
+        <p id="wifi-access-key-error" class="error" role="alert"></p>
+        <p id="wifi-security-message" class="admin-wifi-message"
+           aria-live="polite">
+          Loading Wi-Fi security…
+        </p>
+        <div class="admin-wifi-actions">
+          <button id="wifi-remove-key" class="danger-quiet" type="button"
+                  hidden>Remove access key</button>
+          <button id="wifi-save-key" class="primary" type="button">
+            Set access key
+          </button>
+        </div>
+        <p class="admin-wifi-reconnect">
+          Saving a change restarts Wi-Fi and disconnects every player. Rejoin
+          this network using the new key.
+        </p>
+      </section>
       <div class="dialog-actions admin-actions">
         <button value="close">Close</button>
         <button id="storage-action" class="primary" type="button"

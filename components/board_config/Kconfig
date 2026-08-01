@@ -1,14 +1,19 @@
 menu "PocketArcade"
 
 config PA_AP_SSID
-    string "Access-point SSID"
+    string "Access-point SSID prefix"
     default "PocketArcade"
+    help
+        A persistent random two-character suffix is added on first boot.
+        Keep the prefix to 28 bytes or fewer so the complete SSID fits.
 
 config PA_AP_PASSWORD
-    string "Access-point password (empty for open network)"
+    string "Initial access-point password (empty for open network)"
     default ""
     help
-        Leave empty for an open access point. If set, use 8 to 63 bytes.
+        Leave empty for an open access point. If set, use 8 to 63 printable
+        ASCII characters. An administrator can replace this value from the
+        PocketArcade UI; that device-local setting is persisted in NVS.
 
 config PA_AP_CHANNEL
     int "Wi-Fi channel"

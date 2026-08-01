@@ -1,16 +1,22 @@
 #include "wifi_ap.h"
 
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include "device_identity.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "esp_random.h"
 #include "esp_wifi.h"
 #include "esp_wifi_ap_get_sta_list.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "lwip/inet.h"
+#include "nvs.h"
 #include "system_state.h"
 
 static const char *TAG = "WIFI_AP";
@@ -34,6 +40,138 @@ static station_entry_t stations[CONFIG_PA_AP_MAX_CLIENTS];
 static SemaphoreHandle_t stations_lock;
 static esp_netif_t *ap_netif;
 static uint64_t generation;
+static char configured_ssid[PA_WIFI_SSID_MAX_LEN + 1];
+static char configured_access_key[PA_WIFI_ACCESS_KEY_MAX_LEN + 1];
+static bool settings_ready;
+
+#define PA_WIFI_RECONFIGURE_DELAY_MS 1500
+
+static const char suffix_alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+typedef struct {
+    char access_key[PA_WIFI_ACCESS_KEY_MAX_LEN + 1];
+} security_change_t;
+
+static bool valid_access_key(const char *access_key)
+{
+    if (!access_key) return false;
+    size_t length = strlen(access_key);
+    if (length == 0) return true;
+    if (length < 8 || length > PA_WIFI_ACCESS_KEY_MAX_LEN) return false;
+    for (size_t i = 0; i < length; ++i) {
+        unsigned char value = (unsigned char)access_key[i];
+        if (value < 0x20 || value > 0x7e) return false;
+    }
+    return true;
+}
+
+static bool valid_suffix(const char suffix[3])
+{
+    return suffix[0] != '\0' && suffix[1] != '\0' &&
+           suffix[2] == '\0' &&
+           strchr(suffix_alphabet, suffix[0]) != NULL &&
+           strchr(suffix_alphabet, suffix[1]) != NULL;
+}
+
+static void generate_suffix(char suffix[3])
+{
+    const size_t alphabet_length = sizeof(suffix_alphabet) - 1;
+    suffix[0] = suffix_alphabet[esp_random() % alphabet_length];
+    suffix[1] = suffix_alphabet[esp_random() % alphabet_length];
+    suffix[2] = '\0';
+}
+
+static esp_err_t load_wifi_settings(void)
+{
+    size_t prefix_length = strlen(CONFIG_PA_AP_SSID);
+    if (prefix_length == 0 || prefix_length > PA_WIFI_SSID_MAX_LEN - 3 ||
+        !valid_access_key(CONFIG_PA_AP_PASSWORD)) {
+        ESP_LOGE(TAG,
+                 "SSID prefix must be 1-28 bytes; initial access key must be "
+                 "empty or 8-63 printable ASCII characters");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    nvs_handle_t nvs;
+    esp_err_t err = nvs_open("pa_system", NVS_READWRITE, &nvs);
+    if (err != ESP_OK) return err;
+
+    char suffix[3] = {0};
+    size_t suffix_size = sizeof(suffix);
+    err = nvs_get_str(nvs, "wifi_suffix", suffix, &suffix_size);
+    if (err == ESP_ERR_NVS_NOT_FOUND || err == ESP_ERR_NVS_INVALID_LENGTH ||
+        (err == ESP_OK && !valid_suffix(suffix))) {
+        generate_suffix(suffix);
+        err = nvs_set_str(nvs, "wifi_suffix", suffix);
+        if (err == ESP_OK) err = nvs_commit(nvs);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Generated persistent Wi-Fi SSID suffix");
+        }
+    }
+    if (err != ESP_OK) {
+        nvs_close(nvs);
+        return err;
+    }
+
+    size_t key_size = sizeof(configured_access_key);
+    err = nvs_get_str(nvs, "wifi_key", configured_access_key, &key_size);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        strlcpy(configured_access_key, CONFIG_PA_AP_PASSWORD,
+                sizeof(configured_access_key));
+        err = ESP_OK;
+    } else if (err == ESP_ERR_NVS_INVALID_LENGTH ||
+               (err == ESP_OK && !valid_access_key(configured_access_key))) {
+        ESP_LOGW(TAG, "Stored Wi-Fi access key is invalid; using initial setting");
+        strlcpy(configured_access_key, CONFIG_PA_AP_PASSWORD,
+                sizeof(configured_access_key));
+        err = ESP_OK;
+    }
+    nvs_close(nvs);
+    if (err != ESP_OK) return err;
+
+    int written = snprintf(configured_ssid, sizeof(configured_ssid), "%s-%s",
+                           CONFIG_PA_AP_SSID, suffix);
+    if (written < 0 || (size_t)written >= sizeof(configured_ssid)) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    settings_ready = true;
+    return ESP_OK;
+}
+
+static void apply_security_change(void *argument)
+{
+    security_change_t *change = argument;
+    vTaskDelay(pdMS_TO_TICKS(PA_WIFI_RECONFIGURE_DELAY_MS));
+
+    wifi_config_t config = {0};
+    esp_err_t err = esp_wifi_get_config(WIFI_IF_AP, &config);
+    if (err == ESP_OK) {
+        memset(config.ap.password, 0, sizeof(config.ap.password));
+        strlcpy((char *)config.ap.password, change->access_key,
+                sizeof(config.ap.password));
+        config.ap.authmode = change->access_key[0] != '\0'
+                                 ? WIFI_AUTH_WPA2_WPA3_PSK
+                                 : WIFI_AUTH_OPEN;
+        config.ap.pmf_cfg.required = false;
+        err = esp_wifi_set_config(WIFI_IF_AP, &config);
+        if (err == ESP_OK) {
+            esp_err_t deauth_err = esp_wifi_deauth_sta(0);
+            if (deauth_err != ESP_OK) {
+                ESP_LOGW(TAG, "Could not deauthenticate existing stations: %s",
+                         esp_err_to_name(deauth_err));
+            }
+        }
+    }
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "Applied Wi-Fi security change; clients must reconnect");
+    } else {
+        ESP_LOGE(TAG, "Could not apply Wi-Fi security change: %s",
+                 esp_err_to_name(err));
+    }
+    memset(change, 0, sizeof(*change));
+    free(change);
+    vTaskDelete(NULL);
+}
 
 static void masked_mac(const uint8_t mac[6], char output[18])
 {
@@ -149,15 +287,9 @@ static void ip_event(void *arg, esp_event_base_t base, int32_t id, void *data)
 
 esp_err_t wifi_ap_start(void)
 {
-    size_t password_length = strlen(CONFIG_PA_AP_PASSWORD);
-    if (strlen(CONFIG_PA_AP_SSID) == 0 ||
-        strlen(CONFIG_PA_AP_SSID) > sizeof(((wifi_config_t *)0)->ap.ssid) ||
-        password_length > sizeof(((wifi_config_t *)0)->ap.password) - 1 ||
-        (password_length > 0 && password_length < 8)) {
-        ESP_LOGE(TAG,
-                 "SSID must be 1-32 bytes; password must be empty or 8-63 bytes");
-        return ESP_ERR_INVALID_ARG;
-    }
+    esp_err_t err = load_wifi_settings();
+    if (err != ESP_OK) return err;
+    size_t password_length = strlen(configured_access_key);
     stations_lock = xSemaphoreCreateMutex();
     if (!stations_lock) {
         return ESP_ERR_NO_MEM;
@@ -199,11 +331,11 @@ esp_err_t wifi_ap_start(void)
         IP_EVENT, IP_EVENT_ASSIGNED_IP_TO_CLIENT, ip_event, NULL));
 
     wifi_config_t config = {0};
-    strlcpy((char *)config.ap.ssid, CONFIG_PA_AP_SSID,
+    strlcpy((char *)config.ap.ssid, configured_ssid,
             sizeof(config.ap.ssid));
-    strlcpy((char *)config.ap.password, CONFIG_PA_AP_PASSWORD,
+    strlcpy((char *)config.ap.password, configured_access_key,
             sizeof(config.ap.password));
-    config.ap.ssid_len = (uint8_t)strlen(CONFIG_PA_AP_SSID);
+    config.ap.ssid_len = (uint8_t)strlen(configured_ssid);
     config.ap.channel = CONFIG_PA_AP_CHANNEL;
     config.ap.max_connection = CONFIG_PA_AP_MAX_CLIENTS;
     config.ap.authmode = password_length >= 8
@@ -216,10 +348,66 @@ esp_err_t wifi_ap_start(void)
     ESP_ERROR_CHECK(esp_wifi_start());
     ESP_LOGI(TAG,
              "SoftAP \"%s\" on %s, channel %d, max clients %d, security %s",
-             CONFIG_PA_AP_SSID, PA_GATEWAY_STRING, CONFIG_PA_AP_CHANNEL,
+             configured_ssid, PA_GATEWAY_STRING, CONFIG_PA_AP_CHANNEL,
              CONFIG_PA_AP_MAX_CLIENTS,
              config.ap.authmode == WIFI_AUTH_OPEN ? "open" : "WPA2/WPA3");
     ESP_LOGI(TAG, "DHCP captive portal URI: %s", captive_portal_uri);
+    return ESP_OK;
+}
+
+const char *wifi_ap_ssid(void)
+{
+    return settings_ready ? configured_ssid : CONFIG_PA_AP_SSID;
+}
+
+esp_err_t wifi_ap_get_settings(wifi_ap_settings_t *settings)
+{
+    if (!settings) return ESP_ERR_INVALID_ARG;
+    if (!settings_ready) return ESP_ERR_INVALID_STATE;
+    strlcpy(settings->ssid, configured_ssid, sizeof(settings->ssid));
+    settings->secured = configured_access_key[0] != '\0';
+    return ESP_OK;
+}
+
+esp_err_t wifi_ap_set_access_key(const char *access_key, bool *changed)
+{
+    if (!access_key || !changed || !valid_access_key(access_key)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!settings_ready) return ESP_ERR_INVALID_STATE;
+    *changed = strcmp(access_key, configured_access_key) != 0;
+    if (!*changed) return ESP_OK;
+
+    security_change_t *change = calloc(1, sizeof(*change));
+    if (!change) return ESP_ERR_NO_MEM;
+    strlcpy(change->access_key, access_key, sizeof(change->access_key));
+
+    nvs_handle_t nvs;
+    esp_err_t err = nvs_open("pa_system", NVS_READWRITE, &nvs);
+    if (err != ESP_OK) {
+        memset(change, 0, sizeof(*change));
+        free(change);
+        return err;
+    }
+    err = nvs_set_str(nvs, "wifi_key", access_key);
+    if (err == ESP_OK) err = nvs_commit(nvs);
+    if (err == ESP_OK) {
+        strlcpy(configured_access_key, access_key,
+                sizeof(configured_access_key));
+    }
+    nvs_close(nvs);
+    if (err != ESP_OK) {
+        memset(change, 0, sizeof(*change));
+        free(change);
+        return err;
+    }
+
+    if (xTaskCreate(apply_security_change, "wifi_security", 3072, change, 4,
+                    NULL) != pdPASS) {
+        memset(change, 0, sizeof(*change));
+        free(change);
+        return ESP_ERR_NO_MEM;
+    }
     return ESP_OK;
 }
 
