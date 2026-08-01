@@ -629,6 +629,7 @@ static esp_err_t apps_handler(httpd_req_t *request)
 esp_err_t http_api_start(httpd_handle_t *server)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.stack_size = CONFIG_PA_HTTP_TASK_STACK_BYTES;
     config.max_open_sockets = CONFIG_PA_HTTP_MAX_OPEN_SOCKETS;
     config.max_uri_handlers = CONFIG_PA_HTTP_MAX_URI_HANDLERS;
     /*
@@ -642,8 +643,9 @@ esp_err_t http_api_start(httpd_handle_t *server)
     config.close_fn = close_socket;
     esp_err_t err = httpd_start(server, &config);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "HTTP server started on port %u",
-                 (unsigned)config.server_port);
+        ESP_LOGI(TAG, "HTTP server started on port %u with %u-byte stack",
+                 (unsigned)config.server_port,
+                 (unsigned)config.stack_size);
     }
     return err;
 }

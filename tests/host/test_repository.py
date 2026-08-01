@@ -196,6 +196,21 @@ class RepositoryTests(unittest.TestCase):
         self.assertIn("refreshDeviceStats", client)
         self.assertIn("setTimeout(refreshAdminStats, 2000)", app)
 
+    def test_http_server_has_stack_headroom_for_profile_reconnects(self):
+        kconfig = (ROOT / "components/board_config/Kconfig").read_text()
+        api = (ROOT / "components/http_api/http_api.c").read_text()
+
+        stack_block = re.search(
+            r"config PA_HTTP_TASK_STACK_BYTES\n(.*?)(?=\nconfig )",
+            kconfig,
+            re.S,
+        )
+        self.assertIsNotNone(stack_block)
+        self.assertIn("default 8192", stack_block.group(1))
+        self.assertIn(
+            "config.stack_size = CONFIG_PA_HTTP_TASK_STACK_BYTES", api
+        )
+
     def test_storage_stats_use_supported_fatfs_capacity_api(self):
         storage = (
             ROOT / "components/storage/storage.c"

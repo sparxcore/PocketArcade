@@ -82,6 +82,8 @@ For an AI-Thinker ESP32-CAM, build with
 ## Presence and WebSocket
 
 - [ ] Two devices show one another in realtime.
+- [ ] Reconnecting saved profiles and loading initial WebSocket snapshots does
+      not overflow the HTTP server task stack or reboot the device.
 - [ ] Two tabs for one profile produce one player entry.
 - [ ] Closing one of two tabs produces no departure.
 - [ ] Quick reconnect inside grace produces no duplicate leave/join.
