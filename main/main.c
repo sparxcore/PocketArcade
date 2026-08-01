@@ -56,5 +56,5 @@ void app_main(void)
     websocket_bind_storage_events();
 
     ESP_LOGI(TAG, "Ready: connect to \"%s\" and open http://192.168.4.1/",
-             CONFIG_PA_AP_SSID);
+             wifi_ap_ssid());
 }

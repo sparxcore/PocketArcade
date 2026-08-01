@@ -106,6 +106,34 @@ class RepositoryTests(unittest.TestCase):
         self.assertIn('PA_GATEWAY_STRING "/portal"', captive)
         self.assertIn('"user-portal-url', captive)
         self.assertIn("WIFI_AUTH_OPEN", wifi_source)
+        self.assertIn(
+            'suffix_alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"',
+            wifi_source,
+        )
+        self.assertIn('nvs_get_str(nvs, "wifi_suffix"', wifi_source)
+        self.assertIn('nvs_set_str(nvs, "wifi_suffix"', wifi_source)
+        self.assertIn('"%s-%s"', wifi_source)
+
+    def test_admin_can_manage_persistent_wifi_security(self):
+        wifi_source = (ROOT / "components/wifi_ap/wifi_ap.c").read_text()
+        api = (ROOT / "components/http_api/http_api.c").read_text()
+        page = (ROOT / "web/index.html").read_text()
+        app = (ROOT / "web/js/app.js").read_text()
+        client = (ROOT / "web/js/pocket-arcade.js").read_text()
+
+        self.assertIn('nvs_set_str(nvs, "wifi_key"', wifi_source)
+        self.assertIn("PA_WIFI_RECONFIGURE_DELAY_MS", wifi_source)
+        self.assertIn("WIFI_AUTH_WPA2_WPA3_PSK", wifi_source)
+        self.assertIn("esp_wifi_deauth_sta(0)", wifi_source)
+        self.assertIn('"/api/v1/wifi"', api)
+        self.assertIn('"/api/v1/wifi/security"', api)
+        self.assertIn("wifi_security_handler", api)
+        self.assertIn("request_has_admin_session", api)
+        self.assertNotIn('AddStringToObject(root, "accessKey"', api)
+        self.assertIn('id="wifi-access-key"', page)
+        self.assertIn('id="wifi-remove-key"', page)
+        self.assertIn("validateWifiAccessKey", app)
+        self.assertIn("setWifiAccessKey", client)
 
     def test_storage_first_use_provisioning_is_enabled(self):
         kconfig = (ROOT / "components/board_config/Kconfig").read_text()

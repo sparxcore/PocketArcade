@@ -222,6 +222,74 @@ static esp_err_t storage_mount_handler(httpd_req_t *request)
     return send_json(request, "202 Accepted", root);
 }
 
+static cJSON *wifi_settings_json(bool reconnect_required)
+{
+    wifi_ap_settings_t settings;
+    if (wifi_ap_get_settings(&settings) != ESP_OK) return NULL;
+    cJSON *root = cJSON_CreateObject();
+    if (!root) return NULL;
+    cJSON_AddBoolToObject(root, "ok", true);
+    cJSON_AddStringToObject(root, "ssid", settings.ssid);
+    cJSON_AddBoolToObject(root, "secured", settings.secured);
+    cJSON_AddBoolToObject(root, "reconnectRequired", reconnect_required);
+    return root;
+}
+
+static esp_err_t wifi_settings_handler(httpd_req_t *request)
+{
+    if (!request_has_admin_session(request)) {
+        return send_error(request, "403 Forbidden", "admin_required",
+                          "An administrator profile is required.");
+    }
+    cJSON *root = wifi_settings_json(false);
+    if (!root) {
+        return send_error(request, "503 Service Unavailable",
+                          "wifi_settings_unavailable",
+                          "Wi-Fi settings are not currently available.");
+    }
+    return send_json(request, "200 OK", root);
+}
+
+static esp_err_t wifi_security_handler(httpd_req_t *request)
+{
+    if (!request_has_admin_session(request)) {
+        return send_error(request, "403 Forbidden", "admin_required",
+                          "An administrator profile is required.");
+    }
+    cJSON *body = read_body(request);
+    cJSON *key = cJSON_GetObjectItemCaseSensitive(body, "accessKey");
+    if (!body || !cJSON_IsString(key) || !key->valuestring ||
+        strlen(key->valuestring) > PA_WIFI_ACCESS_KEY_MAX_LEN) {
+        cJSON_Delete(body);
+        return send_error(
+            request, "400 Bad Request", "invalid_access_key",
+            "The access key must be empty or 8-63 printable ASCII characters.");
+    }
+    char access_key[PA_WIFI_ACCESS_KEY_MAX_LEN + 1];
+    strlcpy(access_key, key->valuestring, sizeof(access_key));
+    cJSON_Delete(body);
+
+    bool changed = false;
+    esp_err_t err = wifi_ap_set_access_key(access_key, &changed);
+    memset(access_key, 0, sizeof(access_key));
+    if (err == ESP_ERR_INVALID_ARG) {
+        return send_error(
+            request, "400 Bad Request", "invalid_access_key",
+            "The access key must be empty or 8-63 printable ASCII characters.");
+    }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Could not save Wi-Fi security setting: %s",
+                 esp_err_to_name(err));
+        return send_error(request, "503 Service Unavailable",
+                          "wifi_settings_unavailable",
+                          "The Wi-Fi security setting could not be saved.");
+    }
+
+    cJSON *root = wifi_settings_json(changed);
+    if (!root) return ESP_ERR_NO_MEM;
+    return send_json(request, changed ? "202 Accepted" : "200 OK", root);
+}
+
 static esp_err_t create_profile_handler(httpd_req_t *request)
 {
     cJSON *body = read_body(request);
@@ -591,6 +659,10 @@ esp_err_t http_api_register_routes(httpd_handle_t server)
           .handler = storage_eject_handler },
         { .uri = "/api/v1/storage/mount", .method = HTTP_POST,
           .handler = storage_mount_handler },
+        { .uri = "/api/v1/wifi", .method = HTTP_GET,
+          .handler = wifi_settings_handler },
+        { .uri = "/api/v1/wifi/security", .method = HTTP_PUT,
+          .handler = wifi_security_handler },
         { .uri = "/api/v1/profile", .method = HTTP_POST,
           .handler = create_profile_handler },
         { .uri = "/api/v1/profile/restore", .method = HTTP_POST,

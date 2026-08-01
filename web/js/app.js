@@ -207,6 +207,35 @@ function renderStorage(storage) {
   }
 }
 
+function renderWifiSettings(wifi) {
+  const secured = Boolean(wifi?.secured);
+  const status = byId("wifi-security-status");
+  status.textContent = secured ? "Secured" : "Open";
+  status.classList.toggle("is-secured", secured);
+  status.classList.toggle("is-open", !secured);
+  byId("wifi-ssid").textContent = wifi?.ssid || "PocketArcade";
+  delete byId("wifi-save-key").dataset.label;
+  byId("wifi-save-key").textContent = secured
+    ? "Update access key" : "Set access key";
+  byId("wifi-remove-key").hidden = !secured;
+  byId("wifi-security-message").textContent = secured
+    ? "An access key is required to join this network. The current key is never displayed."
+    : "Anyone nearby can currently join this network.";
+}
+
+function validateWifiAccessKey(value) {
+  if (value.length < 8 || value.length > 63) {
+    return "Use between 8 and 63 characters.";
+  }
+  for (const character of value) {
+    const code = character.codePointAt(0);
+    if (code < 0x20 || code > 0x7e) {
+      return "Use printable ASCII characters only.";
+    }
+  }
+  return "";
+}
+
 function renderProfile(profile) {
   const account = byId("account-pill");
   account.hidden = !profile;
@@ -772,11 +801,86 @@ async function refreshAdminStats() {
 byId("admin-button").addEventListener("click", () => {
   byId("account-pill").open = false;
   renderStorage(arcade.storage);
+  byId("wifi-security-status").textContent = "Checking…";
+  byId("wifi-security-status").className = "security-pill";
+  byId("wifi-security-message").textContent = "Loading Wi-Fi security…";
+  byId("wifi-access-key-error").textContent = "";
+  byId("wifi-access-key").value = "";
+  byId("wifi-access-key").type = "password";
+  byId("wifi-toggle-key").textContent = "Show";
+  byId("wifi-toggle-key").setAttribute("aria-pressed", "false");
+  byId("wifi-access-key-count").textContent = "0 / 63";
   byId("admin-dialog").showModal();
   stopAdminStats();
   void refreshAdminStats();
+  void arcade.refreshWifiSettings()
+    .then(renderWifiSettings)
+    .catch((error) => {
+      byId("wifi-security-status").textContent = "Unavailable";
+      byId("wifi-security-message").textContent = error.message;
+    });
 });
 byId("admin-dialog").addEventListener("close", stopAdminStats);
+
+byId("wifi-access-key").addEventListener("input", (event) => {
+  byId("wifi-access-key-count").textContent =
+    `${event.target.value.length} / 63`;
+  byId("wifi-access-key-error").textContent = "";
+});
+
+async function applyWifiAccessKey(accessKey, button, busyText) {
+  setBusy(button, true, busyText);
+  byId("wifi-access-key-error").textContent = "";
+  try {
+    const wifi = await arcade.setWifiAccessKey(accessKey);
+    renderWifiSettings(wifi);
+    byId("wifi-access-key").value = "";
+    byId("wifi-access-key").type = "password";
+    byId("wifi-toggle-key").textContent = "Show";
+    byId("wifi-toggle-key").setAttribute("aria-pressed", "false");
+    byId("wifi-access-key-count").textContent = "0 / 63";
+    byId("wifi-security-message").textContent = wifi.reconnectRequired
+      ? `Saved. Wi-Fi is restarting; reconnect to ${wifi.ssid}.`
+      : "This security setting is already active.";
+  } catch (error) {
+    byId("wifi-access-key-error").textContent = error.message;
+  } finally {
+    setBusy(button, false);
+  }
+}
+
+byId("wifi-save-key").addEventListener("click", () => {
+  const input = byId("wifi-access-key");
+  const error = validateWifiAccessKey(input.value);
+  byId("wifi-access-key-error").textContent = error;
+  if (error) return input.focus();
+  void applyWifiAccessKey(input.value, byId("wifi-save-key"), "Saving…");
+});
+
+byId("wifi-access-key").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  byId("wifi-save-key").click();
+});
+
+byId("wifi-toggle-key").addEventListener("click", () => {
+  const input = byId("wifi-access-key");
+  const button = byId("wifi-toggle-key");
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
+  button.textContent = showing ? "Show" : "Hide";
+  button.setAttribute("aria-pressed", String(!showing));
+  input.focus();
+});
+
+byId("wifi-remove-key").addEventListener("click", async () => {
+  const confirmed = await confirmAction(
+    "Remove Wi-Fi access key?",
+    "The network will become open and every connected player will be disconnected.",
+    "Remove access key");
+  if (!confirmed) return;
+  void applyWifiAccessKey("", byId("wifi-remove-key"), "Removing…");
+});
 
 function canvasJpeg(canvas, quality) {
   return new Promise((resolve, reject) => {

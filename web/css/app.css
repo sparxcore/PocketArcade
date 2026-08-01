@@ -753,8 +753,64 @@ dialog {
 }
 dialog::backdrop { background: rgba(5,4,12,.76); backdrop-filter: blur(5px); }
 dialog h2 { margin-top: 0; }
+#admin-dialog {
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
 .dialog-actions { display: flex; justify-content: flex-end; gap: .55rem; margin-top: 1rem; }
 .admin-actions { align-items: stretch; }
+.admin-wifi {
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--panel-border);
+}
+.admin-wifi-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+.admin-wifi h3 { margin: 0; font-size: 1.05rem; }
+.security-pill {
+  flex: 0 0 auto;
+  padding: .3rem .55rem;
+  border-radius: 99px;
+  color: var(--muted);
+  background: rgba(255,255,255,.07);
+  font-size: .7rem;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.security-pill.is-secured {
+  color: #76ebd4;
+  background: rgba(72,223,192,.1);
+}
+.security-pill.is-open {
+  color: #f8dc6b;
+  background: rgba(248,220,107,.1);
+}
+.admin-wifi-network { margin: .45rem 0 0; color: var(--muted); }
+.admin-wifi label { margin-top: .9rem; }
+.wifi-key-entry { display: grid; grid-template-columns: 1fr auto; gap: .5rem; }
+.wifi-key-entry input { min-width: 0; }
+.wifi-key-entry button { min-width: 4.3rem; padding-inline: .75rem; }
+.admin-wifi-message {
+  min-height: 1.4em;
+  margin: 0 0 .7rem;
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.4;
+}
+.admin-wifi-actions { display: flex; gap: .55rem; }
+.admin-wifi-actions button { flex: 1 1 0; }
+.admin-wifi-reconnect {
+  margin: .7rem 0 0;
+  color: #aaa2c1;
+  font-size: .72rem;
+  line-height: 1.4;
+}
 .admin-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -820,6 +876,7 @@ dialog h2 { margin-top: 0; }
   .account-menu { right: 0; }
   .admin-actions { flex-direction: column-reverse; }
   .admin-actions button { width: 100%; }
+  .admin-wifi-actions { flex-direction: column-reverse; }
 }
 
 @media (prefers-reduced-motion: reduce) {

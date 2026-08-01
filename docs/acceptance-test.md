@@ -73,7 +73,11 @@ For an AI-Thinker ESP32-CAM, build with
 - [ ] First profile to authenticate after boot receives `role: admin`.
 - [ ] Restart clears the role and assigns it to that session's first login.
 - [ ] Non-admin storage mount/eject requests return `403 admin_required`.
-- [ ] **Profile → Admin** provides mount/eject only to the administrator.
+- [ ] Non-admin Wi-Fi settings requests return `403 admin_required`.
+- [ ] First boot creates `PocketArcade-XX`; reboot preserves the same suffix.
+- [ ] **Profile → Admin** provides mount/eject and Wi-Fi security only to the administrator.
+- [ ] An 8–63 character access key persists and reconnects clients using WPA.
+- [ ] Removing the access key makes the network open after clients reconnect.
 
 ## Presence and WebSocket
 
