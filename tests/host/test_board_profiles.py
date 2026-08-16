@@ -56,7 +56,7 @@ class BoardProfileTests(unittest.TestCase):
         ]
         self.assertEqual(
             [profile["id"] for profile in published],
-            ["esp32-cam-ai-thinker"],
+            ["esp32-cam-ai-thinker", "lilygo-ttgo-t8-classic"],
         )
         self.assertTrue(
             all(profile["status"] == "verified" for profile in published)
@@ -132,11 +132,40 @@ class BoardProfileTests(unittest.TestCase):
                 'definition("microSD", "Required")', installer_script
             )
 
-    def test_pages_workflow_publishes_provisional_board_choices(self):
+    def test_public_package_includes_ttgo_but_not_provisional_profiles(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+
+            def fake_package(profile, destination, version):
+                return {
+                    "id": profile["id"],
+                    "name": profile["name"],
+                    "status": profile["status"],
+                    "manifest": f"firmware/{profile['id']}/manifest.json",
+                }
+
+            with mock.patch.object(
+                self.tool, "package_profile", side_effect=fake_package
+            ):
+                self.tool.package_installer(
+                    self.profiles,
+                    output,
+                    self.tool.project_version(),
+                    include_provisional=False,
+                )
+
+            boards = json.loads((output / "boards.json").read_text())
+            self.assertEqual(
+                [board["id"] for board in boards["boards"]],
+                ["esp32-cam-ai-thinker", "lilygo-ttgo-t8-classic"],
+            )
+
+    def test_pages_workflow_auto_deploys_published_profiles(self):
         workflow = (
             ROOT / ".github" / "workflows" / "firmware-pages.yml"
         ).read_text()
-        self.assertGreaterEqual(workflow.count("--include-provisional"), 2)
+        self.assertIn("push:\n    branches:\n      - main", workflow)
+        self.assertNotIn("--include-provisional", workflow)
 
 
 if __name__ == "__main__":

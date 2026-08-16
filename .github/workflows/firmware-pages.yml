@@ -1,6 +1,9 @@
 name: Build firmware installer
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       version:
@@ -38,12 +41,9 @@ jobs:
           if [ -n "${INSTALLER_VERSION}" ]; then
             python3 tools/board_profiles.py package \
               --output dist/pages \
-              --version "${INSTALLER_VERSION}" \
-              --include-provisional
+              --version "${INSTALLER_VERSION}"
           else
-            python3 tools/board_profiles.py package \
-              --output dist/pages \
-              --include-provisional
+            python3 tools/board_profiles.py package --output dist/pages
           fi
 
       - name: Configure GitHub Pages

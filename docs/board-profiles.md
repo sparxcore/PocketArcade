@@ -41,8 +41,8 @@ Profile: `esp32-cam-ai-thinker`
 | SD D0 | GPIO2 |
 | Card detect | None |
 
-This is the currently verified profile. One-bit mode avoids using the camera
-board's flash LED on GPIO4 and the flash-voltage strapping pin on GPIO12.
+This is a verified profile. One-bit mode avoids using the camera board's flash
+LED on GPIO4 and the flash-voltage strapping pin on GPIO12.
 
 ### LILYGO TTGO T8 classic ESP32
 
@@ -63,6 +63,7 @@ Profile: `lilygo-ttgo-t8-classic`
 LILYGO's classic T8 repository documents these SD pins alongside the
 V1.1/V1.3/V1.7 boards. LILYGO also sold an ESP32-S2 product under the T8 name;
 that is a different target and is deliberately not covered by this profile.
+This profile is hardware-verified and available from the public web installer.
 
 References:
 

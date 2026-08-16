@@ -37,8 +37,8 @@
         "sdkconfig.board.lilygo-ttgo-t8-classic"
       ],
       "buildDirectory": "build/lilygo-ttgo-t8-classic",
-      "status": "provisional",
-      "publish": false,
+      "status": "verified",
+      "publish": true,
       "hardware": {
         "flash": "4 MB",
         "psram": "required",
