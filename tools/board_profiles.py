@@ -17,6 +17,11 @@ ROOT = Path(__file__).resolve().parents[1]
 CATALOGUE_PATH = ROOT / "boards" / "profiles.json"
 INSTALLER_SOURCE = ROOT / "installer"
 BRAND_ASSET = ROOT / "web" / "assets" / "logo-horizontal.webp"
+CHIP_FAMILIES = {
+    "esp32": "ESP32",
+    "esp32s2": "ESP32-S2",
+    "esp32s3": "ESP32-S3",
+}
 
 
 class ProfileError(RuntimeError):
@@ -84,6 +89,17 @@ def validate_profile(profile: dict) -> None:
     if profile["publish"] and profile["status"] != "verified":
         raise ProfileError(
             f"{profile['id']}: provisional profiles cannot be published"
+        )
+    expected_family = CHIP_FAMILIES.get(profile["idfTarget"])
+    if expected_family is None:
+        raise ProfileError(
+            f"{profile['id']}: unsupported ESP-IDF target "
+            f"{profile['idfTarget']!r}"
+        )
+    if profile["chipFamily"] != expected_family:
+        raise ProfileError(
+            f"{profile['id']}: chip family {profile['chipFamily']!r} does "
+            f"not match ESP-IDF target {profile['idfTarget']!r}"
         )
 
     config = config_text(profile)
@@ -222,6 +238,7 @@ def package_profile(profile: dict, output: Path, version: str) -> dict:
     return {
         "id": profile["id"],
         "name": profile["name"],
+        "chipFamily": profile["chipFamily"],
         "status": profile["status"],
         "hardware": profile["hardware"],
         "notes": profile.get("notes", ""),

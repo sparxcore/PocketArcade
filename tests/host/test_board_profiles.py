@@ -30,6 +30,7 @@ class BoardProfileTests(unittest.TestCase):
             {
                 "esp32-cam-ai-thinker",
                 "lilygo-ttgo-t8-classic",
+                "lilygo-ttgo-t8-s3-v1-2",
                 "ai-thinker-esp32-a1s-audio-kit-v2-2",
             },
         )
@@ -56,7 +57,7 @@ class BoardProfileTests(unittest.TestCase):
         ]
         self.assertEqual(
             [profile["id"] for profile in published],
-            ["esp32-cam-ai-thinker", "lilygo-ttgo-t8-classic"],
+            ["esp32-cam-ai-thinker", "lilygo-ttgo-t8-s3-v1-2"],
         )
         self.assertTrue(
             all(profile["status"] == "verified" for profile in published)
@@ -131,6 +132,24 @@ class BoardProfileTests(unittest.TestCase):
             self.assertIn(
                 'definition("microSD", "Required")', installer_script
             )
+            self.assertIn(
+                'definition("Chip", board.chipFamily)', installer_script
+            )
+
+    def test_ttgo_t8_s3_profile_matches_v1_2_hardware(self):
+        profile = self.profiles["lilygo-ttgo-t8-s3-v1-2"]
+        config = self.tool.config_text(profile)
+
+        self.assertEqual(profile["idfTarget"], "esp32s3")
+        self.assertEqual(profile["chipFamily"], "ESP32-S3")
+        self.assertIn("CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y", config)
+        self.assertIn("CONFIG_SPIRAM_MODE_QUAD=y", config)
+        self.assertIn("CONFIG_PA_SDSPI_CS_PIN=10", config)
+        self.assertIn("CONFIG_PA_SDSPI_MOSI_PIN=11", config)
+        self.assertIn("CONFIG_PA_SDSPI_CLK_PIN=12", config)
+        self.assertIn("CONFIG_PA_SDSPI_MISO_PIN=13", config)
+        self.assertIn("CONFIG_PA_SD_POWER_PIN=21", config)
+        self.assertIn("CONFIG_PA_SD_POWER_ACTIVE_HIGH=y", config)
 
     def test_public_package_includes_ttgo_but_not_provisional_profiles(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -157,7 +176,7 @@ class BoardProfileTests(unittest.TestCase):
             boards = json.loads((output / "boards.json").read_text())
             self.assertEqual(
                 [board["id"] for board in boards["boards"]],
-                ["esp32-cam-ai-thinker", "lilygo-ttgo-t8-classic"],
+                ["esp32-cam-ai-thinker", "lilygo-ttgo-t8-s3-v1-2"],
             )
 
     def test_pages_workflow_auto_deploys_published_profiles(self):

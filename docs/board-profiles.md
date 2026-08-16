@@ -63,12 +63,38 @@ Profile: `lilygo-ttgo-t8-classic`
 LILYGO's classic T8 repository documents these SD pins alongside the
 V1.1/V1.3/V1.7 boards. LILYGO also sold an ESP32-S2 product under the T8 name;
 that is a different target and is deliberately not covered by this profile.
-This profile is hardware-verified and available from the public web installer.
+This provisional profile is not available from the public web installer.
 
 References:
 
 - <https://github.com/LilyGO/TTGO-T8-ESP32>
 - <https://wiki.lilygo.cc/zh/products/t8-series/t8/>
+
+### LILYGO TTGO T8-S3 v1.2
+
+Profile: `lilygo-ttgo-t8-s3-v1-2`
+
+| Resource | Configuration |
+|---|---|
+| ESP-IDF target | `esp32s3` |
+| Flash | 16 MB, QIO, 80 MHz |
+| PSRAM | 8 MB external QSPI, required, 80 MHz |
+| SD interface | SDSPI on SPI2, 20 MHz |
+| SD CS | GPIO10 |
+| SD MOSI | GPIO11 |
+| SD MISO | GPIO13 |
+| SD CLK | GPIO12 |
+| Peripheral power enable | GPIO21, active-high |
+| Card detect | None |
+
+This verified profile targets only the T8_S3 v1.2 PCB. Its ESP32-S3 firmware
+and web-flasher manifest are not compatible with the classic ESP32-WROVER T8
+or the earlier ESP32-S2 product.
+
+References:
+
+- <https://github.com/Xinyuan-LilyGO/T8-S3>
+- <https://docs.zephyrproject.org/latest/boards/lilygo/ttgo_t8s3/doc/index.html>
 
 ### AI-Thinker ESP32-A1S Audio Kit v2.2
 

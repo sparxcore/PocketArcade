@@ -445,7 +445,7 @@ class RepositoryTests(unittest.TestCase):
         )
         self.assertTrue(board_catalogue["minimumRequirements"]["sdCard"])
         self.assertTrue(board_catalogue["minimumRequirements"]["psram"])
-        self.assertEqual(len(board_catalogue["profiles"]), 3)
+        self.assertEqual(len(board_catalogue["profiles"]), 4)
         for profile in board_catalogue["profiles"]:
             combined = "\n".join(
                 (ROOT / path).read_text()

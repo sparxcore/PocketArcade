@@ -37,8 +37,8 @@
         "sdkconfig.board.lilygo-ttgo-t8-classic"
       ],
       "buildDirectory": "build/lilygo-ttgo-t8-classic",
-      "status": "verified",
-      "publish": true,
+      "status": "provisional",
+      "publish": false,
       "hardware": {
         "flash": "4 MB",
         "psram": "required",
@@ -48,6 +48,29 @@
       "references": [
         "https://github.com/LilyGO/TTGO-T8-ESP32",
         "https://wiki.lilygo.cc/zh/products/t8-series/t8/"
+      ]
+    },
+    {
+      "id": "lilygo-ttgo-t8-s3-v1-2",
+      "name": "LILYGO TTGO T8-S3 v1.2",
+      "idfTarget": "esp32s3",
+      "chipFamily": "ESP32-S3",
+      "sdkconfigDefaults": [
+        "sdkconfig.defaults",
+        "sdkconfig.board.lilygo-ttgo-t8-s3-v1-2"
+      ],
+      "buildDirectory": "build/lilygo-ttgo-t8-s3-v1-2",
+      "status": "verified",
+      "publish": true,
+      "hardware": {
+        "flash": "16 MB QIO",
+        "psram": "8 MB QSPI, required",
+        "sdCard": "SDSPI: CS GPIO10, MOSI GPIO11, MISO GPIO13, CLK GPIO12; power GPIO21"
+      },
+      "notes": "For the ESP32-S3 T8_S3 v1.2 board with USB-C. Do not use this image on the classic ESP32-WROVER T8 or the ESP32-S2 T8.",
+      "references": [
+        "https://github.com/Xinyuan-LilyGO/T8-S3",
+        "https://docs.zephyrproject.org/latest/boards/lilygo/ttgo_t8s3/doc/index.html"
       ]
     },
     {
